@@ -45,6 +45,14 @@ class Solver {
   explicit Solver(const SolverParameter& param,
       const Solver* root_solver = NULL);
   explicit Solver(const string& param_file, const Solver* root_solver = NULL);
+
+  explicit Solver(const SolverParameter& param, 
+      const map<string, vector<int> >* layer_blobs_global_idx_ptr,
+      const int thread_id);
+  explicit Solver(const string& param_file,
+      const map<string, vector<int> >* layer_blobs_global_idx_ptr,
+	  const int thread_id);
+
   void Init(const SolverParameter& param);
   void InitTrainNet();
   void InitTestNets();
@@ -132,7 +140,7 @@ class Solver {
 
   // official caffe uses map-reduce scheme in multi-GPU
   // training, we use ps to manage parameter traffic 
-  const Solver* const root_solver_;
+  Solver* const root_solver_; // should be constant, change later
   ActionCallback action_request_function_;
   bool requested_early_exit_;
 
@@ -147,7 +155,7 @@ class Solver {
   int max_local_sv_updates_;
   int max_remote_sv_updates_;
 
-  const int thread_id_;
+  int thread_id_; // should be constant, change later
   int client_id_;
   int num_threads_;
   int num_clients_;

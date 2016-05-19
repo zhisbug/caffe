@@ -13,36 +13,67 @@ namespace caffe {
 
 template<typename Dtype>
 void Solver<Dtype>::SetActionFunction(ActionCallback func) {
-  action_request_function_ = func;
+  LOG(FATAL) << "Official Caffe not suppoted";
+  // action_request_function_ = func;
 }
 
 template<typename Dtype>
 SolverAction::Enum Solver<Dtype>::GetRequestedAction() {
-  if (action_request_function_) {
-    // If the external request function has been set, call it.
-    return action_request_function_();
-  }
-  return SolverAction::NONE;
+  LOG(FATAL) << "Official Caffe not suppoted";
+  // if (action_request_function_) {
+  //   // If the external request function has been set, call it.
+  //   return action_request_function_();
+  // }
+  // return SolverAction::NONE;
 }
 
 template <typename Dtype>
 Solver<Dtype>::Solver(const SolverParameter& param, const Solver* root_solver)
-    : net_(), callbacks_(), root_solver_(root_solver),
+    : net_(), callbacks_(), root_solver_(nullptr),
       requested_early_exit_(false) {
+  LOG(FATAL) << "Official Caffe not suppoted";
+  // Init(param);
+}
+
+
+template <typename Dtype>
+Solver<Dtype>::Solver(const string& param_file, const Solver* root_solver)
+    : net_(), callbacks_(), root_solver_(nullptr),
+      requested_early_exit_(false) {
+  LOG(FATAL) << "Official Caffe not suppoted";
+  // SolverParameter param;
+  // ReadSolverParamsFromTextFileOrDie(param_file, &param);
+  // Init(param);
+}
+
+template <typename Dtype>
+Solver<Dtype>::Solver(const SolverParameter& param, 
+    const map<string, vector<int> >* layer_blobs_global_idx_ptr,
+    const int thread_id)
+    : net_(), callbacks_(),  root_solver_(nullptr),
+    requested_early_exit_(false), 
+    layer_blobs_global_idx_ptr_(layer_blobs_global_idx_ptr), 
+    thread_id_(thread_id) {
   Init(param);
 }
 
 template <typename Dtype>
-Solver<Dtype>::Solver(const string& param_file, const Solver* root_solver)
-    : net_(), callbacks_(), root_solver_(root_solver),
-      requested_early_exit_(false) {
+Solver<Dtype>::Solver(const string& param_file,
+    const map<string, vector<int> >* layer_blobs_global_idx_ptr,
+    const int thread_id)
+    : net_(), callbacks_(),  root_solver_(nullptr),
+    requested_early_exit_(false), 
+    layer_blobs_global_idx_ptr_(layer_blobs_global_idx_ptr), 
+    thread_id_(thread_id) {
   SolverParameter param;
-  ReadSolverParamsFromTextFileOrDie(param_file, &param);
+  ReadProtoFromTextFile(param_file, &param);
   Init(param);
 }
 
 template <typename Dtype>
 void Solver<Dtype>::Init(const SolverParameter& param) {
+  LOG(FATAL) << "TODO";
+
   CHECK(Caffe::root_solver() || root_solver_)
       << "root_solver_ needs to be set for all non-root solvers";
   LOG_IF(INFO, Caffe::root_solver()) << "Initializing solver from parameters: "

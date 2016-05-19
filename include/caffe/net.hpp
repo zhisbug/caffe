@@ -23,6 +23,8 @@ namespace caffe {
 template <typename Dtype>
 class Net {
  public:
+  explicit Net(const int thread_id, const int net_id)
+	: thread_id_(thread_id), net_id_(net_id), root_net_(nullptr) {};
   explicit Net(const NetParameter& param, const Net* root_net = NULL);
   explicit Net(const string& param_file, Phase phase,
       const Net* root_net = NULL);
