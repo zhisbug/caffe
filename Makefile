@@ -7,6 +7,11 @@ $(error $(CONFIG_FILE) not found. See $(CONFIG_FILE).example.)
 endif
 include $(CONFIG_FILE)
 
+# Petuum
+CAFFE_DIR := $(shell readlink $(dir $(lastword $(MAKEFILE_LIST))) -f)
+BOSEN_ROOT = $(CAFFE_DIR)/../../bosen
+include $(CAFFE_DIR)/defns-poseidon.mk
+
 BUILD_DIR_LINK := $(BUILD_DIR)
 ifeq ($(RELEASE_BUILD_DIR),)
 	RELEASE_BUILD_DIR := .$(BUILD_DIR)_release
@@ -351,6 +356,25 @@ ifeq ($(CPU_ONLY), 1)
 	TEST_FILTER := --gtest_filter="-*GPU*"
 	COMMON_FLAGS += -DCPU_ONLY
 endif
+
+
+# ------- Begin Petuum
+COMMON_FLAGS += $(BOSEN_INCFLAGS)
+
+CXXFLAGS += -pthread -fPIC $(COMMON_FLAGS) $(WARNINGS)
+CXXFLAGS += $(BOSEN_CXXFLAGS)
+
+NVCCFLAGS += -ccbin=$(CXX) -Xcompiler -fPIC $(COMMON_FLAGS) -std=c++11
+# mex may invoke an older gcc that is too liberal with -Wuninitalized
+MATLAB_CXXFLAGS := $(CXXFLAGS) -Wno-uninitialized
+LINKFLAGS += -static-libstdc++ -fPIC $(COMMON_FLAGS) $(WARNINGS)
+
+LDFLAGS += $(BOSEN_LDFLAGS_DIRS)
+LDFLAGS += $(foreach librarydir,$(LIBRARY_DIRS),-L$(librarydir)) \
+		$(foreach library,$(LIBRARIES),-l$(library))
+
+LDFLAGS += $(BOSEN_LDFLAGS_LIBS)
+# ------- End Petuum
 
 # Python layer support
 ifeq ($(WITH_PYTHON_LAYER), 1)

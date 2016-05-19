@@ -15,6 +15,8 @@ namespace bp = boost::python;
 #include "caffe/caffe.hpp"
 #include "caffe/util/signal_handler.h"
 
+#include <petuum_ps_common/include/petuum_ps.hpp>
+
 using caffe::Blob;
 using caffe::Caffe;
 using caffe::Net;
