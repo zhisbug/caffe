@@ -66,9 +66,31 @@ class Layer {
    */
   void SetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) {
+	LOG(FATAL) << "offical caffe, won't use this";
+    // InitMutex();
+    // CheckBlobCounts(bottom, top);
+    // LayerSetUp(bottom, top);
+    // Reshape(bottom, top);
+    // SetLossWeights(top);
+  }
+
+  void SetUp(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top, 
+	  const int thread_id, const bool init_ps = false, 
+	  int* num_tables = NULL,
+      map<string, vector<int> >* layer_name_to_blob_global_idx = NULL) {
     InitMutex();
+
+    thread_id_ = thread_id;
+#ifndef CPU_ONLY
+    device_id_ = Caffe::GetDeviceId(thread_id);
+#endif
+    if (init_ps) {
+      CHECK_NOTNULL(num_tables);
+      CHECK_NOTNULL(layer_name_to_blob_global_idx);
+    }
     CheckBlobCounts(bottom, top);
-    LayerSetUp(bottom, top);
+    LayerSetUp(bottom, top, init_ps, num_tables, layer_name_to_blob_global_idx);
     Reshape(bottom, top);
     SetLossWeights(top);
   }
@@ -90,7 +112,9 @@ class Layer {
    * adjust the top blob sizes.
    */
   virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
-      const vector<Blob<Dtype>*>& top) {}
+      const vector<Blob<Dtype>*>& top, const bool init_ps = false, 
+      int* num_tables = NULL,
+      map<string, vector<int> >* layer_name_to_blob_global_idx = NULL) {}
 
   /**
    * @brief Whether a layer should be shared by multiple nets during data
@@ -130,6 +154,8 @@ class Layer {
    */
   virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) = 0;
+  void SetUpBlobGlobalTable(const vector<int>& blob_global_id, 
+      const bool init, const bool reg); 
 
   /**
    * @brief Given the bottom blobs, compute the top blobs and the loss.
@@ -318,6 +344,10 @@ class Layer {
 
 
  protected:
+  int thread_id_;
+#ifndef CPU_ONLY
+  int device_id_;
+#endif
   /** The protobuf that stores the layer parameters */
   LayerParameter layer_param_;
   /** The phase: TRAIN or TEST */

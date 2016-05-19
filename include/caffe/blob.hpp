@@ -8,6 +8,7 @@
 #include "caffe/common.hpp"
 #include "caffe/proto/caffe.pb.h"
 #include "caffe/syncedmem.hpp"
+#include <petuum_ps_common/include/petuum_ps.hpp>
 
 const int kMaxBlobAxes = 32;
 
@@ -24,12 +25,14 @@ template <typename Dtype>
 class Blob {
  public:
   Blob()
-       : data_(), diff_(), count_(0), capacity_(0) {}
+       : data_(), diff_(), count_(0), capacity_(0), global_id_(-1) {}
 
   /// @brief Deprecated; use <code>Blob(const vector<int>& shape)</code>.
   explicit Blob(const int num, const int channels, const int height,
       const int width);
   explicit Blob(const vector<int>& shape);
+
+  void CreatePSTable();
 
   /// @brief Deprecated; use <code>Reshape(const vector<int>& shape)</code>.
   void Reshape(const int num, const int channels, const int height,
@@ -150,6 +153,10 @@ class Blob {
     return shape(index);
   }
 
+  inline int global_table_row_capacity() const { return global_table_row_capacity_; }
+  inline int global_id() const { return global_id_; }
+  inline petuum::Table<Dtype>* table() { return global_table_ptr_; }
+
   inline int offset(const int n, const int c = 0, const int h = 0,
       const int w = 0) const {
     CHECK_GE(n, 0);
@@ -226,7 +233,13 @@ class Blob {
   Dtype* mutable_gpu_data();
   Dtype* mutable_cpu_diff();
   Dtype* mutable_gpu_diff();
+
   void Update();
+  void UpdatePSTable();
+  void UpdatePSTable(const Dtype* update);
+
+  void SyncWithPSTable(const int clock);
+
   void FromProto(const BlobProto& proto, bool reshape = true);
   void ToProto(BlobProto* proto, bool write_diff = false) const;
 
@@ -272,6 +285,13 @@ class Blob {
   vector<int> shape_;
   int count_;
   int capacity_;
+
+  // PS BEGIN ----------------------
+  int global_id_;
+  petuum::Table<Dtype> global_table_;
+  petuum::Table<Dtype>* global_table_ptr_;
+  int global_table_row_capacity_;
+  // PS END ----------------------
 
   DISABLE_COPY_AND_ASSIGN(Blob);
 };  // class Blob

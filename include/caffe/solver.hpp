@@ -7,6 +7,8 @@
 #include "caffe/net.hpp"
 #include "caffe/solver_factory.hpp"
 
+#include <petuum_ps_common/include/petuum_ps.hpp>
+
 namespace caffe {
 
 /**
@@ -109,6 +111,16 @@ class Solver {
   void DisplayOutputBlobs(const int net_id);
   void UpdateSmoothedLoss(Dtype loss, int start_iter, int average_loss);
 
+  // PS ----------------------------
+  virtual void InitSVB();
+  virtual void ThreadSyncWithPS(const shared_ptr<Blob<Dtype> >& param,
+      const int param_id, const int param_owner, const int clock);
+  virtual void ThreadSyncWithSVB(
+    const shared_ptr<Blob<Dtype> >& param, const int param_id, 
+    const shared_ptr<Layer<Dtype> >& layer, const int layer_id,
+    const vector<Blob<Dtype>*>& top, const vector<Blob<Dtype>*>& bottom);
+  virtual void JoinSyncThreads();
+
   SolverParameter param_;
   int iter_;
   int current_step_;
@@ -118,16 +130,29 @@ class Solver {
   vector<Dtype> losses_;
   Dtype smoothed_loss_;
 
-  // The root solver that holds root nets (actually containing shared layers)
-  // in data parallelism
+  // official caffe uses map-reduce scheme in multi-GPU
+  // training, we use ps to manage parameter traffic 
   const Solver* const root_solver_;
-
-  // A function that can be set by a client of the Solver to provide indication
-  // that it wants a snapshot saved and/or to exit early.
   ActionCallback action_request_function_;
-
-  // True iff a request to stop early was received.
   bool requested_early_exit_;
+
+  int display_counter_;
+  int test_counter_;
+  int clock_counter_;
+  int param_table_staleness_;
+  // layer/net_name => vector of blobs' global indexes 
+  const map<string, vector<int> >* layer_blobs_global_idx_ptr_; 
+
+  vector<std::thread*> sync_threads_;
+  int max_local_sv_updates_;
+  int max_remote_sv_updates_;
+
+  const int thread_id_;
+  int client_id_;
+  int num_threads_;
+  int num_clients_;
+
+  petuum::HighResolutionTimer total_timer_;
 
   DISABLE_COPY_AND_ASSIGN(Solver);
 };

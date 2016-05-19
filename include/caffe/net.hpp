@@ -31,6 +31,30 @@ class Net {
   /// @brief Initialize a network with a NetParameter.
   void Init(const NetParameter& param);
 
+  // PS BEGIN ---------------------------------------------
+  const int InitPS(const NetParameter& param, const bool create_ps_tables,
+      const int num_additional_tables,
+      map<string, vector<int> >* layer_name_to_blob_global_idx);
+
+  void SyncWithPS(const int clock);
+  void RegisterNetOutputPSTable(const int num_rows);
+
+  inline petuum::Table<Dtype>* table() { return &outputs_global_table_; }
+  inline void set_table(const int global_id) {
+    CHECK_GE(global_id, 0);
+    global_id_ = global_id;
+    outputs_global_table_ = petuum::PSTableGroup::GetTableOrDie<Dtype>(global_id_);
+  }
+
+  void CopyTrainedLayersFrom(const NetParameter& param, 
+      const bool init_ps_tables = false);
+  void CopyTrainedLayersFrom(const string trained_filename, 
+      const bool init_ps_tables = false);
+
+  static void FilterNet(const NetParameter& param,
+      NetParameter* param_filtered);
+  // PS END ---------------------------------------------
+
   /**
    * @brief Run Forward and return the result.
    *
@@ -110,8 +134,6 @@ class Net {
    * @brief For an already initialized net, copies the pre-trained layers from
    *        another Net.
    */
-  void CopyTrainedLayersFrom(const NetParameter& param);
-  void CopyTrainedLayersFrom(const string trained_filename);
   void CopyTrainedLayersFromBinaryProto(const string trained_filename);
   void CopyTrainedLayersFromHDF5(const string trained_filename);
   /// @brief Writes the net to a proto.
@@ -216,13 +238,12 @@ class Net {
 
   void set_debug_info(const bool value) { debug_info_ = value; }
 
+
   // Helpers for Init.
   /**
    * @brief Remove layers that the user specified should be excluded given the current
    *        phase, level, and stage.
    */
-  static void FilterNet(const NetParameter& param,
-      NetParameter* param_filtered);
   /// @brief return whether NetState state meets NetStateRule rule
   static bool StateMeetsRule(const NetState& state, const NetStateRule& rule,
       const string& layer_name);
@@ -307,6 +328,17 @@ class Net {
   bool debug_info_;
   /// The root net that actually holds the shared layers in data parallelism
   const Net* const root_net_;
+
+  // PS BEGIN ---------------------------------------------
+  int client_id_;
+  int thread_id_;  
+  /// -1 means it's the train net, >0 means it's a test net
+  int net_id_;
+  /// global table for net output blobs 
+  int global_id_;
+  petuum::Table<Dtype> outputs_global_table_;
+  // PS END ---------------------------------------------
+
   DISABLE_COPY_AND_ASSIGN(Net);
 };
 
