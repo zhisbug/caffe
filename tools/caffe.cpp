@@ -15,7 +15,9 @@ namespace bp = boost::python;
 #include "caffe/caffe.hpp"
 #include "caffe/util/signal_handler.h"
 
+#include "caffe/caffe_engine.hpp"
 #include <petuum_ps_common/include/petuum_ps.hpp>
+#include <petuum_ps_common/include/system_gflags_declare.hpp>
 
 using caffe::Blob;
 using caffe::Caffe;
@@ -214,6 +216,51 @@ int train() {
     CopyLayers(solver.get(), FLAGS_weights);
   }
 
+  /* ------------------------------ */
+  /* ------------- PS --------------*/
+  /* ------------------------------ */
+
+  // Initialize PS
+  LOG(INFO) << "Initializing PS environment";
+  shared_ptr<caffe::CaffeEngine<float> >
+      caffe_engine(new caffe::CaffeEngine<float>(solver_param));
+  LOG(INFO) << "Tables get ready";
+  petuum::PSTableGroup::CreateTableDone();
+  LOG(INFO) << "PS initialization done.";
+  // if (FLAGS_num_clients > 1 && FLAGS_svb && util::Context::num_ip_layers() > 0) {
+  //   util::Context::set_use_svb(true);
+  // } 
+
+  // Train
+  LOG(INFO) << "Starting NN with " << num_app_threads << " worker threads "
+      << "on client " << FLAGS_client_id;  
+  std::vector<std::thread> threads(num_app_threads); 
+  for (auto& thr : threads) {
+    thr = std::thread(
+        &caffe::CaffeEngine<float>::Start, std::ref(*caffe_engine));
+  }
+
+  // SVB
+  std::thread svb_worker_thread;
+  shared_ptr<caffe::SVBWorker<float> > svb_worker;
+  if (util::Context::use_svb()) {
+    svb_worker.reset(new caffe::SVBWorker<float>());
+    svb_worker_thread = std::thread(
+        &caffe::SVBWorker<float>::Start, std::ref(*svb_worker));
+  }
+
+  // Finish
+  for (auto& thr : threads) {
+    thr.join();
+  }
+  util::Context::set_svb_completed(true);
+  if (util::Context::use_svb()) {
+    svb_worker_thread.join();
+  }
+  LOG(INFO) << "Optimization Done.";
+
+  petuum::PSTableGroup::ShutDown();
+  LOG(INFO) << "NN finished and shut down!";
   if (gpus.size() > 1) {
     caffe::P2PSync<float> sync(solver, NULL, solver->param());
     sync.Run(gpus);
@@ -229,6 +276,8 @@ RegisterBrewFunction(train);
 
 // Test: score a model.
 int test() {
+  LOG(FATAL) << "TODO";
+
   CHECK_GT(FLAGS_model.size(), 0) << "Need a model definition to score.";
   CHECK_GT(FLAGS_weights.size(), 0) << "Need model weights to score.";
 

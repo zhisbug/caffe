@@ -1,49 +1,43 @@
 name: "CIFAR10_quick"
-layer {
+layers {
   name: "cifar"
-  type: "Data"
+  type: DATA
   top: "data"
   top: "label"
-  include {
-    phase: TRAIN
+  data_param {
+    source: "/home/ty/Desktop/poseidon/apps/caffe/examples/cifar10/cifar10_train_leveldb"
+    backend: LEVELDB
+    batch_size: 50
+    shared_file_system: true
   }
   transform_param {
-    mean_file: "examples/cifar10/mean.binaryproto"
+    mean_file: "/home/ty/Desktop/poseidon/apps/caffe/examples/cifar10/mean.binaryproto"
   }
-  data_param {
-    source: "examples/cifar10/cifar10_train_lmdb"
-    batch_size: 100
-    backend: LMDB
-  }
+  include: { phase: TRAIN }
 }
-layer {
+layers {
   name: "cifar"
-  type: "Data"
+  type: DATA
   top: "data"
   top: "label"
-  include {
-    phase: TEST
+  data_param {
+    source: "/home/ty/Desktop/poseidon/apps/caffe/examples/cifar10/cifar10_test_leveldb"
+    backend: LEVELDB
+    batch_size: 100
+    shared_file_system: true
   }
   transform_param {
-    mean_file: "examples/cifar10/mean.binaryproto"
+    mean_file: "/home/ty/Desktop/poseidon/apps/caffe/examples/cifar10/mean.binaryproto"
   }
-  data_param {
-    source: "examples/cifar10/cifar10_test_lmdb"
-    batch_size: 100
-    backend: LMDB
-  }
+  include: { phase: TEST }
 }
-layer {
+layers {
   name: "conv1"
-  type: "Convolution"
+  type: CONVOLUTION
   bottom: "data"
   top: "conv1"
-  param {
-    lr_mult: 1
-  }
-  param {
-    lr_mult: 2
-  }
+  blobs_lr: 1
+  blobs_lr: 2
   convolution_param {
     num_output: 32
     pad: 2
@@ -58,9 +52,9 @@ layer {
     }
   }
 }
-layer {
+layers {
   name: "pool1"
-  type: "Pooling"
+  type: POOLING
   bottom: "conv1"
   top: "pool1"
   pooling_param {
@@ -69,23 +63,19 @@ layer {
     stride: 2
   }
 }
-layer {
+layers {
   name: "relu1"
-  type: "ReLU"
+  type: RELU
   bottom: "pool1"
   top: "pool1"
 }
-layer {
+layers {
   name: "conv2"
-  type: "Convolution"
+  type: CONVOLUTION
   bottom: "pool1"
   top: "conv2"
-  param {
-    lr_mult: 1
-  }
-  param {
-    lr_mult: 2
-  }
+  blobs_lr: 1
+  blobs_lr: 2
   convolution_param {
     num_output: 32
     pad: 2
@@ -100,15 +90,15 @@ layer {
     }
   }
 }
-layer {
+layers {
   name: "relu2"
-  type: "ReLU"
+  type: RELU
   bottom: "conv2"
   top: "conv2"
 }
-layer {
+layers {
   name: "pool2"
-  type: "Pooling"
+  type: POOLING
   bottom: "conv2"
   top: "pool2"
   pooling_param {
@@ -117,17 +107,13 @@ layer {
     stride: 2
   }
 }
-layer {
+layers {
   name: "conv3"
-  type: "Convolution"
+  type: CONVOLUTION
   bottom: "pool2"
   top: "conv3"
-  param {
-    lr_mult: 1
-  }
-  param {
-    lr_mult: 2
-  }
+  blobs_lr: 1
+  blobs_lr: 2
   convolution_param {
     num_output: 64
     pad: 2
@@ -142,15 +128,15 @@ layer {
     }
   }
 }
-layer {
+layers {
   name: "relu3"
-  type: "ReLU"
+  type: RELU
   bottom: "conv3"
   top: "conv3"
 }
-layer {
+layers {
   name: "pool3"
-  type: "Pooling"
+  type: POOLING
   bottom: "conv3"
   top: "pool3"
   pooling_param {
@@ -159,17 +145,13 @@ layer {
     stride: 2
   }
 }
-layer {
+layers {
   name: "ip1"
-  type: "InnerProduct"
+  type: INNER_PRODUCT
   bottom: "pool3"
   top: "ip1"
-  param {
-    lr_mult: 1
-  }
-  param {
-    lr_mult: 2
-  }
+  blobs_lr: 1
+  blobs_lr: 2
   inner_product_param {
     num_output: 64
     weight_filler {
@@ -181,17 +163,13 @@ layer {
     }
   }
 }
-layer {
+layers {
   name: "ip2"
-  type: "InnerProduct"
+  type: INNER_PRODUCT
   bottom: "ip1"
   top: "ip2"
-  param {
-    lr_mult: 1
-  }
-  param {
-    lr_mult: 2
-  }
+  blobs_lr: 1
+  blobs_lr: 2
   inner_product_param {
     num_output: 10
     weight_filler {
@@ -203,19 +181,17 @@ layer {
     }
   }
 }
-layer {
+layers {
   name: "accuracy"
-  type: "Accuracy"
+  type: ACCURACY
   bottom: "ip2"
   bottom: "label"
   top: "accuracy"
-  include {
-    phase: TEST
-  }
+  include: { phase: TEST }
 }
-layer {
+layers {
   name: "loss"
-  type: "SoftmaxWithLoss"
+  type: SOFTMAX_LOSS
   bottom: "ip2"
   bottom: "label"
   top: "loss"
