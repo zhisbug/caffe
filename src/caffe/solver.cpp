@@ -9,6 +9,8 @@
 #include "caffe/util/io.hpp"
 #include "caffe/util/upgrade_proto.hpp"
 
+#include <petuum_ps_common/include/petuum_ps.hpp>
+
 namespace caffe {
 
 template<typename Dtype>

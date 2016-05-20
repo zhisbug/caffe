@@ -19,6 +19,10 @@
 
 #include "caffe/test/test_caffe_main.hpp"
 
+#include <petuum_ps_common/include/petuum_ps.hpp>
+#include <petuum_ps_common/include/system_gflags_declare.hpp>
+#include <petuum_ps_common/include/init_table_group_config.hpp>
+
 namespace caffe {
 
 template <typename Dtype>

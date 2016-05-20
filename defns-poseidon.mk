@@ -33,5 +33,5 @@ BOSEN_LDFLAGS_LIBS = -pthread -lrt -lnsl -luuid \
 	  -lyaml-cpp \
 	  -lleveldb \
           -lnuma
-BOSEN_PS_LIB = $(BOSEN_LIB)/libpetuum-ps.a
+BOSEN_PS_LIB = $(BOSEN_LIB)/libpetuum-ps2.a
 BOSEN_PS_SN_LIB = $(BOSEN_LIB)/libpetuum-ps-sn.a

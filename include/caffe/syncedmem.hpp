@@ -5,6 +5,8 @@
 
 #include "caffe/common.hpp"
 
+#include <petuum_ps_common/include/petuum_ps.hpp>
+
 namespace caffe {
 
 // If CUDA is available and in GPU mode, host memory will be allocated pinned,

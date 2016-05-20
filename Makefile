@@ -630,9 +630,8 @@ $(TOOL_BUILD_DIR)/%: $(TOOL_BUILD_DIR)/%.bin | $(TOOL_BUILD_DIR)
 
 $(TOOL_BINS): %.bin : %.o $(BOSEN_PS_LIB) | $(DYNAMIC_NAME)
 	@ echo CXX/LD -o $@
-	@ echo HIIIIIIII $(BOSEN_PS_LIB) $(DYNAMIC_NAME)
-	@ echo $(Q)$(CXX) $< $(BOSEN_PS_LIB) -o $@ $(LINKFLAGS) -l$(LIBRARY_NAME) $(LDFLAGS) -Wl,-rpath,$(ORIGIN)/../lib
-	$(Q)$(CXX) $< $(BOSEN_PS_LIB) -o $@ $(LINKFLAGS) -l$(LIBRARY_NAME) $(LDFLAGS) \
+	# @ echo $(Q)$(CXX) $< $(BOSEN_PS_LIB) -o $@ $(LINKFLAGS) -l$(LIBRARY_NAME) $(LDFLAGS) -Wl,-rpath,$(ORIGIN)/../lib
+	$(Q)$(CXX) $< -o $@ $(BOSEN_PS_LIB) $(LINKFLAGS) -l$(LIBRARY_NAME) $(LDFLAGS) \
 		-Wl,-rpath,$(ORIGIN)/../lib
 
 $(EXAMPLE_BINS): %.bin : %.o $(BOSEN_PS_LIB) | $(DYNAMIC_NAME)

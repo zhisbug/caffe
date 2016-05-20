@@ -12,6 +12,8 @@
 #include "caffe/syncedmem.hpp"
 #include "caffe/util/math_functions.hpp"
 
+#include <petuum_ps_common/include/petuum_ps.hpp>
+
 namespace caffe {
 
 /// @brief Fills a Blob with constant or randomly-generated data.

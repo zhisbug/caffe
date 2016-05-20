@@ -6,6 +6,10 @@
 #include "caffe/syncedmem.hpp"
 #include "caffe/util/math_functions.hpp"
 
+#include <petuum_ps_common/include/petuum_ps.hpp>
+#include <petuum_ps_common/include/table_gflags_declare.hpp>
+#include <petuum_ps_common/include/init_table_config.hpp>
+
 namespace caffe {
 
 template <typename Dtype>
