@@ -164,6 +164,8 @@ int train() {
   caffe::SolverParameter solver_param;
   caffe::ReadSolverParamsFromTextFileOrDie(FLAGS_solver, &solver_param);
 
+  const int num_app_threads = FLAGS_num_table_threads - 1;
+
   // If the gpus flag is not provided, allow the mode and device to be set
   // in the solver prototxt.
   if (FLAGS_gpu.size() == 0
@@ -217,7 +219,7 @@ int train() {
   }
 
   /* ------------------------------ */
-  /* ------------- PS --------------*/
+  /* ---------     PS     ----------*/
   /* ------------------------------ */
 
   // Initialize PS
@@ -240,35 +242,42 @@ int train() {
         &caffe::CaffeEngine<float>::Start, std::ref(*caffe_engine));
   }
 
-  // SVB
-  std::thread svb_worker_thread;
-  shared_ptr<caffe::SVBWorker<float> > svb_worker;
-  if (util::Context::use_svb()) {
-    svb_worker.reset(new caffe::SVBWorker<float>());
-    svb_worker_thread = std::thread(
-        &caffe::SVBWorker<float>::Start, std::ref(*svb_worker));
-  }
+  // // SVB
+  // std::thread svb_worker_thread;
+  // shared_ptr<caffe::SVBWorker<float> > svb_worker;
+  // if (util::Context::use_svb()) {
+  //   svb_worker.reset(new caffe::SVBWorker<float>());
+  //   svb_worker_thread = std::thread(
+  //       &caffe::SVBWorker<float>::Start, std::ref(*svb_worker));
+  // }
 
   // Finish
   for (auto& thr : threads) {
     thr.join();
   }
-  util::Context::set_svb_completed(true);
-  if (util::Context::use_svb()) {
-    svb_worker_thread.join();
-  }
+  // util::Context::set_svb_completed(true);
+  // if (util::Context::use_svb()) {
+  //   svb_worker_thread.join();
+  // }
   LOG(INFO) << "Optimization Done.";
 
   petuum::PSTableGroup::ShutDown();
   LOG(INFO) << "NN finished and shut down!";
-  if (gpus.size() > 1) {
-    caffe::P2PSync<float> sync(solver, NULL, solver->param());
-    sync.Run(gpus);
-  } else {
-    LOG(INFO) << "Starting Optimization";
-    solver->Solve();
-  }
-  LOG(INFO) << "Optimization Done.";
+
+
+  /* ------------------------------ */
+  /* ------- Offical Caffe  --------*/
+  /* ------------------------------ */
+
+  // if (gpus.size() > 1) {
+  //   caffe::P2PSync<float> sync(solver, NULL, solver->param());
+  //   sync.Run(gpus);
+  // } else {
+  //   LOG(INFO) << "Starting Optimization";
+  //   solver->Solve();
+  // }
+  // LOG(INFO) << "Optimization Done.";
+
   return 0;
 }
 RegisterBrewFunction(train);

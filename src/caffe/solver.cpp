@@ -12,6 +12,30 @@
 namespace caffe {
 
 template<typename Dtype>
+void Solver<Dtype>::InitSVB() {
+
+}
+
+template<typename Dtype>
+void Solver<Dtype>::ThreadSyncWithPS(const shared_ptr<Blob<Dtype> >& param,
+    const int param_id, const int param_owner, const int clock) {
+
+}
+
+template<typename Dtype>
+void Solver<Dtype>::ThreadSyncWithSVB(
+  const shared_ptr<Blob<Dtype> >& param, const int param_id, 
+  const shared_ptr<Layer<Dtype> >& layer, const int layer_id,
+  const vector<Blob<Dtype>*>& top, const vector<Blob<Dtype>*>& bottom){
+
+}
+
+template<typename Dtype>
+void Solver<Dtype>::JoinSyncThreads(){
+
+}
+
+template<typename Dtype>
 void Solver<Dtype>::SetActionFunction(ActionCallback func) {
   LOG(FATAL) << "Official Caffe not suppoted";
   // action_request_function_ = func;
@@ -54,6 +78,7 @@ Solver<Dtype>::Solver(const SolverParameter& param,
     requested_early_exit_(false), 
     layer_blobs_global_idx_ptr_(layer_blobs_global_idx_ptr), 
     thread_id_(thread_id) {
+  LOG(FATAL) << "TODO";
   Init(param);
 }
 
@@ -65,9 +90,10 @@ Solver<Dtype>::Solver(const string& param_file,
     requested_early_exit_(false), 
     layer_blobs_global_idx_ptr_(layer_blobs_global_idx_ptr), 
     thread_id_(thread_id) {
-  SolverParameter param;
-  ReadProtoFromTextFile(param_file, &param);
-  Init(param);
+  LOG(FATAL) << "TODO";
+  // SolverParameter param;
+  // ReadProtoFromTextFile(param_file, &param);
+  // Init(param);
 }
 
 template <typename Dtype>
@@ -306,6 +332,8 @@ void Solver<Dtype>::Step(int iters) {
 
 template <typename Dtype>
 void Solver<Dtype>::Solve(const char* resume_file) {
+  LOG(FATAL) << "TODO";
+
   CHECK(Caffe::root_solver());
   LOG(INFO) << "Solving " << net_->name();
   LOG(INFO) << "Learning Rate Policy: " << param_.lr_policy();
