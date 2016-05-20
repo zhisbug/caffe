@@ -358,23 +358,6 @@ ifeq ($(CPU_ONLY), 1)
 endif
 
 
-# ------- Begin Petuum
-COMMON_FLAGS += $(BOSEN_INCFLAGS)
-
-CXXFLAGS += -pthread -fPIC $(COMMON_FLAGS) $(WARNINGS)
-CXXFLAGS += $(BOSEN_CXXFLAGS)
-
-NVCCFLAGS += -ccbin=$(CXX) -Xcompiler -fPIC $(COMMON_FLAGS) -std=c++11
-# mex may invoke an older gcc that is too liberal with -Wuninitalized
-MATLAB_CXXFLAGS := $(CXXFLAGS) -Wno-uninitialized
-LINKFLAGS += -static-libstdc++ -fPIC $(COMMON_FLAGS) $(WARNINGS)
-
-LDFLAGS += $(BOSEN_LDFLAGS_DIRS)
-LDFLAGS += $(foreach librarydir,$(LIBRARY_DIRS),-L$(librarydir)) \
-		$(foreach library,$(LIBRARIES),-l$(library))
-
-LDFLAGS += $(BOSEN_LDFLAGS_LIBS)
-# ------- End Petuum
 
 # Python layer support
 ifeq ($(WITH_PYTHON_LAYER), 1)
@@ -441,6 +424,15 @@ endif
 LDFLAGS += $(foreach librarydir,$(LIBRARY_DIRS),-L$(librarydir)) $(PKG_CONFIG) \
 		$(foreach library,$(LIBRARIES),-l$(library))
 PYTHON_LDFLAGS := $(LDFLAGS) $(foreach library,$(PYTHON_LIBRARIES),-l$(library))
+
+# ------- Begin Petuum
+COMMON_FLAGS += $(BOSEN_INCFLAGS)
+
+CXXFLAGS += $(BOSEN_CXXFLAGS)
+
+LDFLAGS += $(BOSEN_LDFLAGS_DIRS)
+LDFLAGS += $(BOSEN_LDFLAGS_LIBS)
+# ------- End Petuum
 
 # 'superclean' target recursively* deletes all files ending with an extension
 # in $(SUPERCLEAN_EXTS) below.  This may be useful if you've built older
