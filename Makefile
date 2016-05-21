@@ -632,7 +632,6 @@ $(TOOL_BUILD_DIR)/%: $(TOOL_BUILD_DIR)/%.bin | $(TOOL_BUILD_DIR)
 
 $(TOOL_BINS): %.bin : %.o | $(DYNAMIC_NAME)
 	@ echo CXX/LD -o $@
-	# @ echo $(Q)$(CXX) $< $(BOSEN_PS_LIB) -o $@ $(LINKFLAGS) -l$(LIBRARY_NAME) $(LDFLAGS) -Wl,-rpath,$(ORIGIN)/../lib
 	$(Q)$(CXX) $< -o $@ $(LINKFLAGS) -l$(LIBRARY_NAME) $(BOSEN_PS_LIB) $(LDFLAGS) \
 		-Wl,-rpath,$(ORIGIN)/../lib
 

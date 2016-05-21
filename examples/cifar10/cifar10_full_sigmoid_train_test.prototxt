@@ -1,4 +1,4 @@
-name: "CIFAR10_quick"
+name: "CIFAR10_full"
 layer {
   name: "cifar"
   type: "Data"
@@ -12,7 +12,7 @@ layer {
   }
   data_param {
     source: "examples/cifar10/cifar10_train_lmdb"
-    batch_size: 100
+    batch_size: 111
     backend: LMDB
   }
 }
@@ -29,7 +29,7 @@ layer {
   }
   data_param {
     source: "examples/cifar10/cifar10_test_lmdb"
-    batch_size: 100
+    batch_size: 1000
     backend: LMDB
   }
 }
@@ -69,16 +69,20 @@ layer {
     stride: 2
   }
 }
+
+
+
 layer {
-  name: "relu1"
-  type: "ReLU"
+  name: "Sigmoid1"
+  type: "Sigmoid"
   bottom: "pool1"
-  top: "pool1"
+  top: "Sigmoid1"
 }
+
 layer {
   name: "conv2"
   type: "Convolution"
-  bottom: "pool1"
+  bottom: "Sigmoid1"
   top: "conv2"
   param {
     lr_mult: 1
@@ -100,16 +104,18 @@ layer {
     }
   }
 }
+
+
 layer {
-  name: "relu2"
-  type: "ReLU"
+  name: "Sigmoid2"
+  type: "Sigmoid"
   bottom: "conv2"
-  top: "conv2"
+  top: "Sigmoid2"
 }
 layer {
   name: "pool2"
   type: "Pooling"
-  bottom: "conv2"
+  bottom: "Sigmoid2"
   top: "pool2"
   pooling_param {
     pool: AVE
@@ -122,12 +128,6 @@ layer {
   type: "Convolution"
   bottom: "pool2"
   top: "conv3"
-  param {
-    lr_mult: 1
-  }
-  param {
-    lr_mult: 2
-  }
   convolution_param {
     num_output: 64
     pad: 2
@@ -141,17 +141,26 @@ layer {
       type: "constant"
     }
   }
+  param {
+    lr_mult: 1
+  }
+  param {
+    lr_mult: 1
+  }
+
 }
+
 layer {
-  name: "relu3"
-  type: "ReLU"
+  name: "Sigmoid3"
+  type: "Sigmoid"
   bottom: "conv3"
-  top: "conv3"
+  top: "Sigmoid3"
 }
+
 layer {
   name: "pool3"
   type: "Pooling"
-  bottom: "conv3"
+  bottom: "Sigmoid3"
   top: "pool3"
   pooling_param {
     pool: AVE
@@ -159,6 +168,7 @@ layer {
     stride: 2
   }
 }
+
 layer {
   name: "ip1"
   type: "InnerProduct"
@@ -166,37 +176,17 @@ layer {
   top: "ip1"
   param {
     lr_mult: 1
+    decay_mult: 0
   }
   param {
     lr_mult: 2
-  }
-  inner_product_param {
-    num_output: 64
-    weight_filler {
-      type: "gaussian"
-      std: 0.1
-    }
-    bias_filler {
-      type: "constant"
-    }
-  }
-}
-layer {
-  name: "ip2"
-  type: "InnerProduct"
-  bottom: "ip1"
-  top: "ip2"
-  param {
-    lr_mult: 1
-  }
-  param {
-    lr_mult: 2
+    decay_mult: 0
   }
   inner_product_param {
     num_output: 10
     weight_filler {
       type: "gaussian"
-      std: 0.1
+      std: 0.01
     }
     bias_filler {
       type: "constant"
@@ -206,7 +196,7 @@ layer {
 layer {
   name: "accuracy"
   type: "Accuracy"
-  bottom: "ip2"
+  bottom: "ip1"
   bottom: "label"
   top: "accuracy"
   include {
@@ -216,7 +206,7 @@ layer {
 layer {
   name: "loss"
   type: "SoftmaxWithLoss"
-  bottom: "ip2"
+  bottom: "ip1"
   bottom: "label"
   top: "loss"
 }
