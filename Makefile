@@ -409,11 +409,15 @@ CXXFLAGS += -MMD -MP
 
 # Complete build flags.
 COMMON_FLAGS += $(foreach includedir,$(INCLUDE_DIRS),-I$(includedir))
+#Petuum
+COMMON_FLAGS += $(BOSEN_INCFLAGS)
 CXXFLAGS += -pthread -fPIC $(COMMON_FLAGS) $(WARNINGS)
-NVCCFLAGS += -ccbin=$(CXX) -Xcompiler -fPIC $(COMMON_FLAGS)
+#Petuum
+CXXFLAGS += $(BOSEN_CXXFLAGS)
+NVCCFLAGS += -ccbin=$(CXX) -Xcompiler -fPIC $(COMMON_FLAGS) -std=c++11
 # mex may invoke an older gcc that is too liberal with -Wuninitalized
 MATLAB_CXXFLAGS := $(CXXFLAGS) -Wno-uninitialized
-LINKFLAGS += -pthread -fPIC $(COMMON_FLAGS) $(WARNINGS)
+LINKFLAGS += -static-libstdc++ -pthread -fPIC $(COMMON_FLAGS) $(WARNINGS)
 
 USE_PKG_CONFIG ?= 0
 ifeq ($(USE_PKG_CONFIG), 1)
@@ -421,20 +425,13 @@ ifeq ($(USE_PKG_CONFIG), 1)
 else
 	PKG_CONFIG :=
 endif
+#Petuum
+LDFLAGS += $(BOSEN_LDFLAGS_DIRS)
 LDFLAGS += $(foreach librarydir,$(LIBRARY_DIRS),-L$(librarydir)) $(PKG_CONFIG) \
 		$(foreach library,$(LIBRARIES),-l$(library))
-PYTHON_LDFLAGS := $(LDFLAGS) $(foreach library,$(PYTHON_LIBRARIES),-l$(library))
-
-# ------- Begin Petuum
-COMMON_FLAGS += $(BOSEN_INCFLAGS)
-
-LINKFLAGS += -static-libstdc++ -fPIC $(COMMON_FLAGS) $(WARNINGS)
-
-CXXFLAGS += $(BOSEN_CXXFLAGS)
-
-LDFLAGS += $(BOSEN_LDFLAGS_DIRS)
+#Petuum
 LDFLAGS += $(BOSEN_LDFLAGS_LIBS)
-# ------- End Petuum
+PYTHON_LDFLAGS := $(LDFLAGS) $(foreach library,$(PYTHON_LIBRARIES),-l$(library))
 
 # 'superclean' target recursively* deletes all files ending with an extension
 # in $(SUPERCLEAN_EXTS) below.  This may be useful if you've built older
@@ -582,9 +579,9 @@ $(DYNAMIC_NAME): $(OBJS) | $(LIB_BUILD_DIR)
 	$(Q)$(CXX) -shared -o $@ $(OBJS) $(VERSIONFLAGS) $(LINKFLAGS) $(LDFLAGS)
 	@ cd $(BUILD_DIR)/lib; rm -f $(DYNAMIC_NAME_SHORT);   ln -s $(DYNAMIC_VERSIONED_NAME_SHORT) $(DYNAMIC_NAME_SHORT)
 
-$(STATIC_NAME): $(OBJS) $(BOSEN_PS_LIB) | $(LIB_BUILD_DIR)
+$(STATIC_NAME): $(OBJS) | $(LIB_BUILD_DIR)
 	@ echo AR -o $@
-	$(Q)ar rcs $@ $(OBJS) $(BOSEN_PS_LIB)
+	$(Q)ar rcs $@ $(OBJS)
 
 $(BUILD_DIR)/%.o: %.cpp | $(ALL_BUILD_DIRS)
 	@ echo CXX $<
@@ -635,7 +632,7 @@ $(TOOL_BINS): %.bin : %.o | $(DYNAMIC_NAME)
 	$(Q)$(CXX) $< -o $@ $(LINKFLAGS) -l$(LIBRARY_NAME) $(BOSEN_PS_LIB) $(LDFLAGS) \
 		-Wl,-rpath,$(ORIGIN)/../lib
 
-$(EXAMPLE_BINS): %.bin : %.o $(BOSEN_PS_LIB) | $(DYNAMIC_NAME)
+$(EXAMPLE_BINS): %.bin : %.o | $(DYNAMIC_NAME)
 	@ echo CXX/LD -o $@
 	$(Q)$(CXX) $< -o $@ $(LINKFLAGS) -l$(LIBRARY_NAME) $(BOSEN_PS_LIB) $(LDFLAGS) \
 		-Wl,-rpath,$(ORIGIN)/../../lib
