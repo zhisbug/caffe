@@ -428,6 +428,8 @@ PYTHON_LDFLAGS := $(LDFLAGS) $(foreach library,$(PYTHON_LIBRARIES),-l$(library))
 # ------- Begin Petuum
 COMMON_FLAGS += $(BOSEN_INCFLAGS)
 
+LINKFLAGS += -static-libstdc++ -fPIC $(COMMON_FLAGS) $(WARNINGS)
+
 CXXFLAGS += $(BOSEN_CXXFLAGS)
 
 LDFLAGS += $(BOSEN_LDFLAGS_DIRS)
@@ -580,9 +582,9 @@ $(DYNAMIC_NAME): $(OBJS) | $(LIB_BUILD_DIR)
 	$(Q)$(CXX) -shared -o $@ $(OBJS) $(VERSIONFLAGS) $(LINKFLAGS) $(LDFLAGS)
 	@ cd $(BUILD_DIR)/lib; rm -f $(DYNAMIC_NAME_SHORT);   ln -s $(DYNAMIC_VERSIONED_NAME_SHORT) $(DYNAMIC_NAME_SHORT)
 
-$(STATIC_NAME): $(OBJS) | $(LIB_BUILD_DIR)
+$(STATIC_NAME): $(OBJS) $(BOSEN_PS_LIB) | $(LIB_BUILD_DIR)
 	@ echo AR -o $@
-	$(Q)ar rcs $@ $(OBJS)
+	$(Q)ar rcs $@ $(OBJS) $(BOSEN_PS_LIB)
 
 $(BUILD_DIR)/%.o: %.cpp | $(ALL_BUILD_DIRS)
 	@ echo CXX $<
@@ -628,10 +630,10 @@ $(TOOL_BUILD_DIR)/%: $(TOOL_BUILD_DIR)/%.bin | $(TOOL_BUILD_DIR)
 	@ $(RM) $@
 	@ ln -s $(notdir $<) $@
 
-$(TOOL_BINS): %.bin : %.o $(BOSEN_PS_LIB) | $(DYNAMIC_NAME)
+$(TOOL_BINS): %.bin : %.o | $(DYNAMIC_NAME)
 	@ echo CXX/LD -o $@
 	# @ echo $(Q)$(CXX) $< $(BOSEN_PS_LIB) -o $@ $(LINKFLAGS) -l$(LIBRARY_NAME) $(LDFLAGS) -Wl,-rpath,$(ORIGIN)/../lib
-	$(Q)$(CXX) $< -o $@ $(BOSEN_PS_LIB) $(LINKFLAGS) -l$(LIBRARY_NAME) $(LDFLAGS) \
+	$(Q)$(CXX) $< -o $@ $(LINKFLAGS) -l$(LIBRARY_NAME) $(BOSEN_PS_LIB) $(LDFLAGS) \
 		-Wl,-rpath,$(ORIGIN)/../lib
 
 $(EXAMPLE_BINS): %.bin : %.o $(BOSEN_PS_LIB) | $(DYNAMIC_NAME)
