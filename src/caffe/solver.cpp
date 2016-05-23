@@ -57,10 +57,18 @@ void Solver<Dtype>::Init(const SolverParameter& param) {
   InitTrainNet();
   if (Caffe::root_solver()) {
     InitTestNets();
+    InitPS();
     LOG(INFO) << "Solver scaffolding done.";
   }
   iter_ = 0;
   current_step_ = 0;
+}
+
+template <typename Dtype>
+void Solver<Dtype>::InitPS() {
+  CHECK(Caffe::root_solver()) << "InitPS can only be called by root_solver.";
+  // TODO:
+
 }
 
 template <typename Dtype>
@@ -250,6 +258,8 @@ void Solver<Dtype>::Step(int iters) {
     for (int i = 0; i < callbacks_.size(); ++i) {
       callbacks_[i]->on_gradients_ready();
     }
+
+    SyncWithPS();
     ApplyUpdate();
 
     // Increment the internal iter_ counter -- its value should always indicate
@@ -271,6 +281,13 @@ void Solver<Dtype>::Step(int iters) {
       break;
     }
   }
+}
+
+template <typename Dtype>
+void Solver<Dtype>::SyncWithPS() {
+  if (!Caffe::root_solver())
+    return;
+  // TODO: SyncWithPS
 }
 
 template <typename Dtype>
