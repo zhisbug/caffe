@@ -38,16 +38,18 @@ class CaffeEngine {
   const int GetNumTestNets();
 
   SolverParameter param_;
-  shared_ptr<Net<Dtype> > net_;
-  
   NetParameter net_param_;
+
+  shared_ptr<Net<Dtype> > net_;
 
   int num_tables_;
   // layer_name => vector of blobs' global indexes 
   map<string, vector<int> > layer_blobs_global_idx_; 
   //
   std::atomic<int> thread_counter_;
+
   int loss_table_staleness_;
+  int num_threads_;
 
   DISABLE_COPY_AND_ASSIGN(CaffeEngine);
 };

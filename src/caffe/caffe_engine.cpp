@@ -23,7 +23,7 @@ namespace caffe {
 template <typename Dtype>
 CaffeEngine<Dtype>::CaffeEngine(const SolverParameter& param)
     : net_(), num_tables_(0), thread_counter_(0) {
-  // Init(param);
+  Init(param);
 }
 
 template <typename Dtype>
@@ -53,22 +53,21 @@ CaffeEngine<Dtype>::CaffeEngine(const NetParameter& net_param) :
 
 template <typename Dtype>
 void CaffeEngine<Dtype>::Init(const SolverParameter& param) {
-  // param_ = param;
-  // if (param_.random_seed() >= 0) {
-  //   Caffe::set_random_seed(param_.random_seed());
-  // }
-  // util::Context& context = util::Context::get_instance();
-  // loss_table_staleness_ = context.get_int32("table_staleness");
-  // const int num_threads = context.num_app_threads();
-  // Caffe::initialize_phases(num_threads);
+  param_ = param;
+  if (param_.random_seed() >= 0) {
+    Caffe::set_random_seed(param_.random_seed());
+  }
+  // TODO: pass parameter
+  loss_table_staleness_ = 0;
+  num_threads_ = 1;
 
-  // // Scaffolding code
-  // InitPS();
+  // Scaffolding code
+  InitPS();
 }
 
 template <typename Dtype>
 void CaffeEngine<Dtype>::InitPS() {
-  // const int num_test_nets = GetNumTestNets();
+  const int num_test_nets = GetNumTestNets();
   // InitPSForTrainNet(num_test_nets + 1);
   // LOG(INFO) << "Init PS for train nets done";
   // InitPSForTestNets(num_test_nets);
@@ -86,22 +85,34 @@ void CaffeEngine<Dtype>::InitPSForTrainNet(const int num_additional_tables) {
   //     << "one of these fields specifying a train_net: " << field_names;
   // NetParameter net_param;
   // if (param_.has_train_net_param()) {
+  //   LOG_IF(INFO, Caffe::root_solver())
+  //       << "Creating training net specified in train_net_param.";
   //   net_param.CopyFrom(param_.train_net_param());
   // } else if (param_.has_train_net()) {
+  //   LOG_IF(INFO, Caffe::root_solver())
+  //       << "Creating training net from train_net file: " << param_.train_net();
   //   ReadNetParamsFromTextFileOrDie(param_.train_net(), &net_param);
   // }
   // if (param_.has_net_param()) {
+  //   LOG_IF(INFO, Caffe::root_solver())
+  //       << "Creating training net specified in net_param.";
   //   net_param.CopyFrom(param_.net_param());
   // }
   // if (param_.has_net()) {
+  //   LOG_IF(INFO, Caffe::root_solver())
+  //       << "Creating training net from net file: " << param_.net();
   //   ReadNetParamsFromTextFileOrDie(param_.net(), &net_param);
   // }
+  // // Set the correct NetState.  We start with the solver defaults (lowest
+  // // precedence); then, merge in any NetState specified by the net_param itself;
+  // // finally, merge in any NetState specified by the train_state (highest
+  // // precedence).
   // NetState net_state;
   // net_state.set_phase(TRAIN);
   // net_state.MergeFrom(net_param.state());
   // net_state.MergeFrom(param_.train_state());
   // net_param.mutable_state()->CopyFrom(net_state);
-
+  // 
   // CHECK_GT(param_.display(), 0)
   //     << "Set display > 0 in solver prototxt file.";
 
@@ -228,13 +239,19 @@ void CaffeEngine<Dtype>::CreatePSTableForNetOutputs(
 template <typename Dtype>
 const int CaffeEngine<Dtype>::GetNumTestNets() {
   // const bool has_net_param = param_.has_net_param();
+  // LOG(INFO) << has_net_param;
   // const bool has_net_file = param_.has_net();
+  // LOG(INFO) << has_net_file;
   // const int num_generic_nets = has_net_param + has_net_file;
   // CHECK_LE(num_generic_nets, 1)
   //     << "Both net_param and net_file may not be specified.";
+
   // const int num_test_net_params = param_.test_net_param_size();
+  // LOG(INFO) << num_test_net_params;
   // const int num_test_net_files = param_.test_net_size();
+  // LOG(INFO) << num_test_net_files;
   // const int num_test_nets = num_test_net_params + num_test_net_files;
+
   // if (num_generic_nets) {
   //     CHECK_GE(param_.test_iter_size(), num_test_nets)
   //         << "test_iter must be specified for each test network.";
@@ -242,6 +259,7 @@ const int CaffeEngine<Dtype>::GetNumTestNets() {
   //     CHECK_EQ(param_.test_iter_size(), num_test_nets)
   //         << "test_iter must be specified for each test network.";
   // }
+
   // const int num_generic_net_instances = param_.test_iter_size() - num_test_nets;
   // const int num_test_net_instances = num_test_nets + num_generic_net_instances;
 

@@ -52,6 +52,16 @@ DEFINE_string(sighup_effect, "snapshot",
              "Optional; action to take when a SIGHUP signal is received: "
              "snapshot, stop or none.");
 
+// --- Petuum Flag
+DEFINE_string(net_outputs, "", 
+	"The logging for petuum.");
+DEFINE_int32(num_rows_per_table, 1,
+	"Petuum params.");
+DEFINE_bool(svb, false,
+	"Petuum params.");
+DEFINE_int32(table_staleness, 0,
+	"Petuum params.");
+
 // A simple registry for caffe commands.
 typedef int (*BrewFunction)();
 typedef std::map<caffe::string, BrewFunction> BrewMap;
@@ -164,7 +174,11 @@ int train() {
   caffe::SolverParameter solver_param;
   caffe::ReadSolverParamsFromTextFileOrDie(FLAGS_solver, &solver_param);
 
+  LOG(INFO) << "-----------------------";
+
   const int num_app_threads = FLAGS_num_table_threads - 1;
+
+  LOG(INFO) << "-----------------------";
 
   // If the gpus flag is not provided, allow the mode and device to be set
   // in the solver prototxt.
@@ -206,18 +220,6 @@ int train() {
         GetRequestedAction(FLAGS_sigint_effect),
         GetRequestedAction(FLAGS_sighup_effect));
 
-  shared_ptr<caffe::Solver<float> >
-      solver(caffe::SolverRegistry<float>::CreateSolver(solver_param));
-
-  solver->SetActionFunction(signal_handler.GetActionFunction());
-
-  if (FLAGS_snapshot.size()) {
-    LOG(INFO) << "Resuming from " << FLAGS_snapshot;
-    solver->Restore(FLAGS_snapshot.c_str());
-  } else if (FLAGS_weights.size()) {
-    CopyLayers(solver.get(), FLAGS_weights);
-  }
-
   /* ------------------------------ */
   /* ---------     PS     ----------*/
   /* ------------------------------ */
@@ -229,9 +231,6 @@ int train() {
   LOG(INFO) << "Tables get ready";
   petuum::PSTableGroup::CreateTableDone();
   LOG(INFO) << "PS initialization done.";
-  // if (FLAGS_num_clients > 1 && FLAGS_svb && util::Context::num_ip_layers() > 0) {
-  //   util::Context::set_use_svb(true);
-  // } 
 
   // Train
   LOG(INFO) << "Starting NN with " << num_app_threads << " worker threads "
@@ -241,15 +240,6 @@ int train() {
     thr = std::thread(
         &caffe::CaffeEngine<float>::Start, std::ref(*caffe_engine));
   }
-
-  // // SVB
-  // std::thread svb_worker_thread;
-  // shared_ptr<caffe::SVBWorker<float> > svb_worker;
-  // if (util::Context::use_svb()) {
-  //   svb_worker.reset(new caffe::SVBWorker<float>());
-  //   svb_worker_thread = std::thread(
-  //       &caffe::SVBWorker<float>::Start, std::ref(*svb_worker));
-  // }
 
   // Finish
   for (auto& thr : threads) {
