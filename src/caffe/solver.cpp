@@ -83,17 +83,17 @@ void Solver<Dtype>::InitPS() {
   
   auto layers = net_->layers();
   int num_tables = 0;
-  for (auto& layer : layers)
+  for (auto& layer : layers) {
     num_tables += CountLayerBlobs(layer.get());
+  }
 
-    petuum::TableGroupConfig table_group_config;
-   petuum::InitTableGroupConfig(&table_group_config, num_tables+1);
-//   petuum::PSTableGroup::RegisterRow<petuum::DenseRow<Dtype> >
-//     (caffe::kDenseRowDtypeID);
-// 
-//   // Use false to not let main thread access table API.
-//   // ??????????????????
-//   petuum::PSTableGroup::Init(table_group_config, false);
+  petuum::TableGroupConfig table_group_config;
+  petuum::InitTableGroupConfig(&table_group_config, num_tables+1);
+  petuum::PSTableGroup::RegisterRow<petuum::DenseRow<Dtype> >
+    (caffe::kDenseRowDtypeID);
+ 
+  // ?? : Use false to not let main thread access table API.
+  petuum::PSTableGroup::Init(table_group_config, false);
 
   int global_counter = 0;
   for (auto& layer : layers) {

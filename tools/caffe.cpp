@@ -56,7 +56,7 @@ DEFINE_string(sighup_effect, "snapshot",
              "snapshot, stop or none.");
 
 // --- Petuum Flag
-#include <petuum_ps_common/include/system_gflags.cpp> // SHOULD NOT BE LIKE THIS...
+// #include <petuum_ps_common/include/system_gflags.cpp> // SHOULD NOT BE LIKE THIS...
 DEFINE_string(net_outputs, "", 
     "The logging for petuum.");
 DEFINE_int32(num_rows_per_table, 1,
