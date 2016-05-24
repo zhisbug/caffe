@@ -164,6 +164,16 @@ class Caffe {
   inline static bool root_solver() { return Get().root_solver_; }
   inline static void set_root_solver(bool val) { Get().root_solver_ = val; }
 
+  // -------- Poseidon
+  inline static string net_outputs() { return Get().net_outputs_; }
+  inline static int num_rows_per_table() { return Get().num_rows_per_table_; }
+  inline static bool svb() { return Get().svb_; }
+  inline static int table_staleness() { return Get().table_staleness_; }
+  inline static void set_net_outputs(string s) { Get().net_outputs_ = s; }
+  inline static void set_num_rows_per_table(int val) { Get().num_rows_per_table_ = val; }
+  inline static void set_svb(int val) { Get().svb_ = val; }
+  inline static void set_table_staleness(int val) { Get().table_staleness_ = val; }
+
  protected:
 #ifndef CPU_ONLY
   cublasHandle_t cublas_handle_;
@@ -175,12 +185,26 @@ class Caffe {
   int solver_count_;
   bool root_solver_;
 
+  // -------- Poseidon
+  string net_outputs_;
+  int num_rows_per_table_;
+  bool svb_;
+  int table_staleness_;
+
  private:
   // The private constructor to avoid duplicate instantiation.
   Caffe();
 
   DISABLE_COPY_AND_ASSIGN(Caffe);
 };
+
+// -------- Poseidon
+const int kDenseRowDtypeID = 0;
+// columns of net ouput tables
+const int kNumFixedCols = 3;
+const int kColIdxOutputTableIter = 0;
+const int kColIdxOutputTableTime = 1;
+const int kColIdxOutputTableLoss = 2;
 
 }  // namespace caffe
 

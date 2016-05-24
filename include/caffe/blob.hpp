@@ -9,6 +9,8 @@
 #include "caffe/proto/caffe.pb.h"
 #include "caffe/syncedmem.hpp"
 
+#include <petuum_ps_common/include/petuum_ps.hpp>
+
 const int kMaxBlobAxes = 32;
 
 namespace caffe {
@@ -24,7 +26,8 @@ template <typename Dtype>
 class Blob {
  public:
   Blob()
-       : data_(), diff_(), count_(0), capacity_(0) {}
+       : data_(), diff_(), count_(0), capacity_(0), 
+       global_id_(-1), global_table_row_capacity_(-1) {}
 
   /// @brief Deprecated; use <code>Blob(const vector<int>& shape)</code>.
   explicit Blob(const int num, const int channels, const int height,
@@ -265,6 +268,14 @@ class Blob {
 
   bool ShapeEquals(const BlobProto& other);
 
+  // -------- Poseidon
+  inline int global_table_row_capacity() const { return global_table_row_capacity_; }
+  inline int global_id() const { return global_id_; }
+  void CreatePSTable(int global_id);
+  void UpdatePSTable();
+  void UpdatePSTable(const Dtype* update);
+  void SyncWithPSTable(const int clock);
+
  protected:
   shared_ptr<SyncedMemory> data_;
   shared_ptr<SyncedMemory> diff_;
@@ -272,6 +283,12 @@ class Blob {
   vector<int> shape_;
   int count_;
   int capacity_;
+
+  // -------- Poseidon
+  int global_id_;
+  int global_table_row_capacity_;
+  petuum::Table<Dtype> global_table_;
+  petuum::Table<Dtype>* global_table_ptr_;
 
   DISABLE_COPY_AND_ASSIGN(Blob);
 };  // class Blob

@@ -15,6 +15,17 @@ namespace bp = boost::python;
 #include "caffe/caffe.hpp"
 #include "caffe/util/signal_handler.h"
 
+#include <petuum_ps_common/include/petuum_ps.hpp>
+#include <petuum_ps_common/include/system_gflags_declare.hpp>
+#include <petuum_ps_common/include/table_gflags_declare.hpp>
+#include <petuum_ps_common/include/init_table_config.hpp>
+#include <petuum_ps_common/include/host_info.hpp>
+#include <petuum_ps_common/util/utils.hpp>
+
+// #include <petuum_ps_common/include/petuum_ps.hpp>
+// #include <petuum_ps_common/include/table_gflags_declare.hpp>
+// #include <petuum_ps_common/include/init_table_config.hpp>
+
 using caffe::Blob;
 using caffe::Caffe;
 using caffe::Net;
@@ -47,6 +58,15 @@ DEFINE_string(sigint_effect, "stop",
 DEFINE_string(sighup_effect, "snapshot",
              "Optional; action to take when a SIGHUP signal is received: "
              "snapshot, stop or none.");
+
+// --- Petuum Flag
+// #include <petuum_ps_common/include/system_gflags.cpp> // SHOULD NOT BE LIKE THIS...
+DEFINE_string(net_outputs, "", 
+    "The logging for petuum.");
+DEFINE_int32(num_rows_per_table, 1,
+    "Petuum params.");
+DEFINE_bool(svb, false,
+    "Petuum params.");
 
 // A simple registry for caffe commands.
 typedef int (*BrewFunction)();
@@ -199,6 +219,15 @@ int train() {
   caffe::SignalHandler signal_handler(
         GetRequestedAction(FLAGS_sigint_effect),
         GetRequestedAction(FLAGS_sighup_effect));
+
+  // -------- Poseidon
+  Caffe::set_net_outputs(FLAGS_net_outputs); 
+  Caffe::set_num_rows_per_table(FLAGS_num_rows_per_table);
+  Caffe::set_svb(FLAGS_svb);
+  Caffe::set_table_staleness(FLAGS_table_staleness); 
+
+  // petuum::ClientTableConfig table_config;
+  // petuum::InitTableConfig(&table_config);
 
   shared_ptr<caffe::Solver<float> >
       solver(caffe::SolverRegistry<float>::CreateSolver(solver_param));

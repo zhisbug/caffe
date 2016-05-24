@@ -3,6 +3,7 @@
 #include <boost/function.hpp>
 #include <string>
 #include <vector>
+#include <map>
 
 #include "caffe/net.hpp"
 #include "caffe/solver_factory.hpp"
@@ -94,6 +95,11 @@ class Solver {
    */
   virtual inline const char* type() const { return ""; }
 
+  // -------- Poseidon
+  int CountLayerBlobs(Layer<Dtype>*);
+  void InitPS();
+  void SyncWithPS();
+
  protected:
   // Make and apply the update value for the current iteration.
   virtual void ApplyUpdate() = 0;
@@ -128,6 +134,10 @@ class Solver {
 
   // True iff a request to stop early was received.
   bool requested_early_exit_;
+
+  // -------- Poseidon
+  int client_id_;
+  map<string, vector<int> > layer_blobs_global_idx_;
 
   DISABLE_COPY_AND_ASSIGN(Solver);
 };
