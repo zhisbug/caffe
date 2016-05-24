@@ -165,6 +165,10 @@ class Caffe {
   inline static void set_root_solver(bool val) { Get().root_solver_ = val; }
 
   // -------- Poseidon
+  inline static string net_outputs() { return Get().net_outputs_; }
+  inline static int num_rows_per_table() { return Get().num_rows_per_table_; }
+  inline static bool svb() { return Get().svb_; }
+  inline static int table_staleness() { return Get().table_staleness_; }
   inline static void set_net_outputs(string s) { Get().net_outputs_ = s; }
   inline static void set_num_rows_per_table(int val) { Get().num_rows_per_table_ = val; }
   inline static void set_svb(int val) { Get().svb_ = val; }
