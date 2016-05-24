@@ -222,11 +222,6 @@ int train() {
   Caffe::set_svb(FLAGS_svb);
   Caffe::set_table_staleness(FLAGS_table_staleness); 
 
-  petuum::ClientTableConfig table_config;
-  petuum::InitTableConfig(&table_config);
-
-  LOG(FATAL) << "------------------------";
-
   shared_ptr<caffe::Solver<float> >
       solver(caffe::SolverRegistry<float>::CreateSolver(solver_param));
 

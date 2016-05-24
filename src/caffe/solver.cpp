@@ -9,6 +9,10 @@
 #include "caffe/util/io.hpp"
 #include "caffe/util/upgrade_proto.hpp"
 
+#include <petuum_ps_common/include/petuum_ps.hpp>
+#include <petuum_ps_common/include/system_gflags_declare.hpp>
+#include <petuum_ps_common/include/init_table_group_config.hpp>
+
 namespace caffe {
 
 template<typename Dtype>
@@ -65,8 +69,43 @@ void Solver<Dtype>::Init(const SolverParameter& param) {
 }
 
 template <typename Dtype>
+int Solver<Dtype>::CountLayerBlobs(Layer<Dtype>* layer) {
+  string type(layer->type());
+  if (type == "InnerProduct" || type == "Convolution" )
+    return layer->blobs().size();
+  else
+    return 0;
+}
+
+template <typename Dtype>
 void Solver<Dtype>::InitPS() {
   CHECK(Caffe::root_solver()) << "InitPS can only be called by root_solver.";
+  
+  auto layers = net_->layers();
+  int num_tables = 0;
+  for (auto& layer : layers)
+    num_tables += CountLayerBlobs(layer.get());
+
+    petuum::TableGroupConfig table_group_config;
+   petuum::InitTableGroupConfig(&table_group_config, num_tables+1);
+//   petuum::PSTableGroup::RegisterRow<petuum::DenseRow<Dtype> >
+//     (caffe::kDenseRowDtypeID);
+// 
+//   // Use false to not let main thread access table API.
+//   // ??????????????????
+//   petuum::PSTableGroup::Init(table_group_config, false);
+
+  int global_counter = 0;
+  for (auto& layer : layers) {
+    string type(layer->type());
+    LOG(INFO) << type;
+    auto& blobs = layer->blobs();
+    for (int i = 0; i < CountLayerBlobs(layer.get()); ++i) {
+      blobs[i]->CreatePSTable(global_counter++);
+    }
+  }
+
+  LOG(FATAL) << "------------------------";
   // TODO:
 
 }

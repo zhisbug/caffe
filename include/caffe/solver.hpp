@@ -96,7 +96,7 @@ class Solver {
   virtual inline const char* type() const { return ""; }
 
   // -------- Poseidon
-  // only called by root_solver;
+  int CountLayerBlobs(Layer<Dtype>*);
   void InitPS();
   void SyncWithPS();
 

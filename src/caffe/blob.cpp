@@ -535,6 +535,20 @@ void Blob<float>::ToProto(BlobProto* proto, bool write_diff) const {
   }
 }
 
+
+// -------- Poseidon
+template <typename Dtype>
+void Blob<Dtype>::CreatePSTable(int global_id) {
+  LOG(INFO) << "register PSTable with id: " << global_id;
+}
+
+template <typename Dtype>
+void Blob<Dtype>::UpdatePSTable() {}
+template <typename Dtype>
+void Blob<Dtype>::UpdatePSTable(const Dtype* update) {}
+template <typename Dtype>
+void Blob<Dtype>::SyncWithPSTable(const int clock) {}
+
 INSTANTIATE_CLASS(Blob);
 template class Blob<int>;
 template class Blob<unsigned int>;
