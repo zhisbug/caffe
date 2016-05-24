@@ -22,6 +22,10 @@ namespace bp = boost::python;
 #include <petuum_ps_common/include/host_info.hpp>
 #include <petuum_ps_common/util/utils.hpp>
 
+// #include <petuum_ps_common/include/petuum_ps.hpp>
+// #include <petuum_ps_common/include/table_gflags_declare.hpp>
+// #include <petuum_ps_common/include/init_table_config.hpp>
+
 using caffe::Blob;
 using caffe::Caffe;
 using caffe::Net;
@@ -221,6 +225,9 @@ int train() {
   Caffe::set_num_rows_per_table(FLAGS_num_rows_per_table);
   Caffe::set_svb(FLAGS_svb);
   Caffe::set_table_staleness(FLAGS_table_staleness); 
+
+  // petuum::ClientTableConfig table_config;
+  // petuum::InitTableConfig(&table_config);
 
   shared_ptr<caffe::Solver<float> >
       solver(caffe::SolverRegistry<float>::CreateSolver(solver_param));

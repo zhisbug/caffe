@@ -92,8 +92,8 @@ void Solver<Dtype>::InitPS() {
   petuum::PSTableGroup::RegisterRow<petuum::DenseRow<Dtype> >
     (caffe::kDenseRowDtypeID);
  
-  // ?? : Use false to not let main thread access table API.
-  petuum::PSTableGroup::Init(table_group_config, false);
+  petuum::PSTableGroup::Init(table_group_config, true);
+  LOG(INFO) << "TableGroupInit done";
 
   int global_counter = 0;
   for (auto& layer : layers) {
@@ -105,9 +105,33 @@ void Solver<Dtype>::InitPS() {
     }
   }
 
-  LOG(FATAL) << "------------------------";
-  // TODO:
+}
 
+template <typename Dtype>
+void Solver<Dtype>::SyncWithPS() {
+  if (!Caffe::root_solver())
+    return;
+
+  LOG(INFO) << "SyncWithPS";
+
+  auto layers = net_->layers();
+  for (auto& layer : layers) {
+    string type(layer->type());
+    LOG(INFO) << type;
+    auto& blobs = layer->blobs();
+    for (int i = 0; i < CountLayerBlobs(layer.get()); ++i) {
+      blobs[i]->UpdatePSTable();
+      // blobs[i]->SyncWithPSTable(clock+1);
+    }
+  }
+
+  LOG(FATAL) << "------------------------";
+
+  // ????
+  petuum::PSTableGroup::GlobalBarrier();
+
+  petuum::PSTableGroup::Clock();
+  // TODO: SyncWithPS
 }
 
 template <typename Dtype>
@@ -320,13 +344,6 @@ void Solver<Dtype>::Step(int iters) {
       break;
     }
   }
-}
-
-template <typename Dtype>
-void Solver<Dtype>::SyncWithPS() {
-  if (!Caffe::root_solver())
-    return;
-  // TODO: SyncWithPS
 }
 
 template <typename Dtype>

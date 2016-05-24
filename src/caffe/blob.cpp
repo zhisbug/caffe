@@ -6,6 +6,10 @@
 #include "caffe/syncedmem.hpp"
 #include "caffe/util/math_functions.hpp"
 
+#include <petuum_ps_common/include/petuum_ps.hpp>
+#include <petuum_ps_common/include/table_gflags_declare.hpp>
+#include <petuum_ps_common/include/init_table_config.hpp>
+
 namespace caffe {
 
 template <typename Dtype>
@@ -539,11 +543,39 @@ void Blob<float>::ToProto(BlobProto* proto, bool write_diff) const {
 // -------- Poseidon
 template <typename Dtype>
 void Blob<Dtype>::CreatePSTable(int global_id) {
-  LOG(INFO) << "register PSTable with id: " << global_id;
+  CHECK(Caffe::root_solver()) << "Can only be called by root";
+  CHECK_GE(count_, 0);
+
+  global_id_ = global_id;
+
+  // Creating PS tables 
+  petuum::ClientTableConfig table_config;
+  petuum::InitTableConfig(&table_config);
+  // 
+  table_config.thread_cache_capacity = 1;
+  table_config.table_info.row_type = caffe::kDenseRowDtypeID;
+  table_config.table_info.table_staleness = Caffe::table_staleness();
+
+  int num_rows_per_table = Caffe::num_rows_per_table();
+  table_config.process_cache_capacity = num_rows_per_table * 10;
+  table_config.oplog_capacity = table_config.process_cache_capacity;
+  global_table_row_capacity_
+      = (count_ + num_rows_per_table - 1) / num_rows_per_table;
+  table_config.table_info.row_capacity = global_table_row_capacity_;
+  table_config.table_info.dense_row_oplog_capacity
+      = global_table_row_capacity_;
+  table_config.no_oplog_replay = true;
+
+  petuum::PSTableGroup::CreateTable(global_id_, table_config);
+  LOG(INFO) << "CreateTable: "
+    << "id " << global_id << "\t" 
+    << "size " << num_rows_per_table << "x" << global_table_row_capacity_;  
 }
 
 template <typename Dtype>
-void Blob<Dtype>::UpdatePSTable() {}
+void Blob<Dtype>::UpdatePSTable() {
+}
+
 template <typename Dtype>
 void Blob<Dtype>::UpdatePSTable(const Dtype* update) {}
 template <typename Dtype>
