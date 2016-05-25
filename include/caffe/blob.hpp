@@ -271,9 +271,13 @@ class Blob {
   // -------- Poseidon
   inline int global_table_row_capacity() const { return global_table_row_capacity_; }
   inline int global_id() const { return global_id_; }
+  /** 
+   * @brief Init Table with global_id. Upload/Download data_.
+   */
   void CreatePSTable(int global_id);
+  /* @brief Upload the diff_ to PSTable */
   void UpdatePSTable();
-  void UpdatePSTable(const Dtype* update);
+  /* @brief Download data_ from PSTable */
   void SyncWithPSTable(const int clock);
 
  protected:

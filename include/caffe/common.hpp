@@ -169,10 +169,13 @@ class Caffe {
   inline static int num_rows_per_table() { return Get().num_rows_per_table_; }
   inline static bool svb() { return Get().svb_; }
   inline static int table_staleness() { return Get().table_staleness_; }
+  inline static int client_id() {return Get().client_id_; }
+
   inline static void set_net_outputs(string s) { Get().net_outputs_ = s; }
   inline static void set_num_rows_per_table(int val) { Get().num_rows_per_table_ = val; }
   inline static void set_svb(int val) { Get().svb_ = val; }
   inline static void set_table_staleness(int val) { Get().table_staleness_ = val; }
+  inline static void set_client_id(int val) { Get().client_id_ = val; }
 
  protected:
 #ifndef CPU_ONLY
@@ -186,6 +189,7 @@ class Caffe {
   bool root_solver_;
 
   // -------- Poseidon
+  int client_id_;
   string net_outputs_;
   int num_rows_per_table_;
   bool svb_;

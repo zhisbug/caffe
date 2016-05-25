@@ -221,6 +221,7 @@ int train() {
         GetRequestedAction(FLAGS_sighup_effect));
 
   // -------- Poseidon
+  Caffe::set_client_id(FLAGS_client_id);
   Caffe::set_net_outputs(FLAGS_net_outputs); 
   Caffe::set_num_rows_per_table(FLAGS_num_rows_per_table);
   Caffe::set_svb(FLAGS_svb);

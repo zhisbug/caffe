@@ -2,6 +2,7 @@
 
 #include <string>
 #include <vector>
+#include <thread>
 
 #include "caffe/solver.hpp"
 #include "caffe/util/format.hpp"
@@ -62,6 +63,9 @@ void Solver<Dtype>::Init(const SolverParameter& param) {
   if (Caffe::root_solver()) {
     InitTestNets();
     InitPS();
+    // // Do in another thread for now
+    // std::thread t(&Solver<Dtype>::InitPS, this);
+    // t.join();
     LOG(INFO) << "Solver scaffolding done.";
   }
   iter_ = 0;
@@ -81,6 +85,7 @@ template <typename Dtype>
 void Solver<Dtype>::InitPS() {
   CHECK(Caffe::root_solver()) << "InitPS can only be called by root_solver.";
   
+  // -------- Init Table Group
   auto layers = net_->layers();
   int num_tables = 0;
   for (auto& layer : layers) {
@@ -95,6 +100,7 @@ void Solver<Dtype>::InitPS() {
   petuum::PSTableGroup::Init(table_group_config, true);
   LOG(INFO) << "TableGroupInit done";
 
+  // -------- Init Individual Table
   int global_counter = 0;
   for (auto& layer : layers) {
     string type(layer->type());
@@ -105,6 +111,8 @@ void Solver<Dtype>::InitPS() {
     }
   }
 
+  LOG(INFO) << "Tables get ready";
+  petuum::PSTableGroup::CreateTableDone();
 }
 
 template <typename Dtype>
@@ -127,11 +135,9 @@ void Solver<Dtype>::SyncWithPS() {
 
   LOG(FATAL) << "------------------------";
 
-  // ????
-  petuum::PSTableGroup::GlobalBarrier();
+  // petuum::PSTableGroup::GlobalBarrier();
 
   petuum::PSTableGroup::Clock();
-  // TODO: SyncWithPS
 }
 
 template <typename Dtype>
@@ -323,7 +329,7 @@ void Solver<Dtype>::Step(int iters) {
     }
 
     SyncWithPS();
-    ApplyUpdate();
+    // ApplyUpdate();
 
     // Increment the internal iter_ counter -- its value should always indicate
     // the number of times the weights have been updated.
@@ -393,6 +399,7 @@ void Solver<Dtype>::Solve(const char* resume_file) {
     TestAll();
   }
   LOG(INFO) << "Optimization Done.";
+  petuum::PSTableGroup::ShutDown();
 }
 
 template <typename Dtype>

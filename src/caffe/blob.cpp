@@ -547,26 +547,41 @@ void Blob<Dtype>::CreatePSTable(int global_id) {
   CHECK_GE(count_, 0);
 
   global_id_ = global_id;
+  int num_rows_per_table = Caffe::num_rows_per_table();
+  global_table_row_capacity_
+      = (count_ + num_rows_per_table - 1) / num_rows_per_table;
 
-  // Creating PS tables 
+  // Server side PS tables -------- 
   petuum::ClientTableConfig table_config;
   petuum::InitTableConfig(&table_config);
-  // 
+
   table_config.thread_cache_capacity = 1;
   table_config.table_info.row_type = caffe::kDenseRowDtypeID;
   table_config.table_info.table_staleness = Caffe::table_staleness();
-
-  int num_rows_per_table = Caffe::num_rows_per_table();
   table_config.process_cache_capacity = num_rows_per_table * 10;
   table_config.oplog_capacity = table_config.process_cache_capacity;
-  global_table_row_capacity_
-      = (count_ + num_rows_per_table - 1) / num_rows_per_table;
   table_config.table_info.row_capacity = global_table_row_capacity_;
   table_config.table_info.dense_row_oplog_capacity
       = global_table_row_capacity_;
   table_config.no_oplog_replay = true;
 
   petuum::PSTableGroup::CreateTable(global_id_, table_config);
+
+  // Client side PS tables -------- 
+  global_table_ = petuum::PSTableGroup::GetTableOrDie<Dtype>(global_id_);
+  global_table_ptr_ = &global_table_;
+  for (int ridx = 0; ridx < num_rows_per_table; ++ridx) {
+    global_table_ptr_->GetAsyncForced(ridx);
+  }
+  global_table_ptr_->WaitPendingAsyncGet();
+
+  // Upload or Download Params --------
+  if (Caffe::client_id() == 0) {
+    // Upload Params 
+  } else {
+    // Download Params
+  }
+
   LOG(INFO) << "CreateTable: "
     << "id " << global_id << "\t" 
     << "size " << num_rows_per_table << "x" << global_table_row_capacity_;  
@@ -574,12 +589,25 @@ void Blob<Dtype>::CreatePSTable(int global_id) {
 
 template <typename Dtype>
 void Blob<Dtype>::UpdatePSTable() {
+  const Dtype* update = static_cast<const Dtype*>(diff_->cpu_data());
+  int update_idx = 0;
+  for (int r = 0; r < Caffe::num_rows_per_table(); ++r) {
+    petuum::UpdateBatch<Dtype> update_batch(global_table_row_capacity_);
+    for (int i = 0; i < global_table_row_capacity_; ++i) {
+      update_batch.UpdateSet(i, i, Dtype(-1) * update[update_idx]);
+      ++update_idx;
+      if (update_idx >= count_) { break; }
+    }
+    global_table_ptr_->BatchInc(r, update_batch);
+    if (update_idx >= count_) { break; }
+  }
 }
 
 template <typename Dtype>
-void Blob<Dtype>::UpdatePSTable(const Dtype* update) {}
-template <typename Dtype>
-void Blob<Dtype>::SyncWithPSTable(const int clock) {}
+void Blob<Dtype>::SyncWithPSTable(const int clock) {
+  
+
+}
 
 INSTANTIATE_CLASS(Blob);
 template class Blob<int>;
