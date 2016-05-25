@@ -137,6 +137,7 @@ class Solver {
 
   // -------- Poseidon
   int client_id_;
+  int clock_ = 0;
   map<string, vector<int> > layer_blobs_global_idx_;
 
   DISABLE_COPY_AND_ASSIGN(Solver);

@@ -575,21 +575,19 @@ void Blob<Dtype>::CreatePSTable(int global_id) {
   }
   global_table_ptr_->WaitPendingAsyncGet();
 
-  // Upload or Download Params --------
-  if (Caffe::client_id() == 0) {
-    // Upload Params 
-  } else {
-    // Download Params
-  }
-
   LOG(INFO) << "CreateTable: "
     << "id " << global_id << "\t" 
     << "size " << num_rows_per_table << "x" << global_table_row_capacity_;  
 }
 
 template <typename Dtype>
-void Blob<Dtype>::UpdatePSTable() {
-  const Dtype* update = static_cast<const Dtype*>(diff_->cpu_data());
+void Blob<Dtype>::UpdatePSTable(bool is_data) {
+  const Dtype* update;
+  if (is_data)
+    update = static_cast<const Dtype*>(data_->cpu_data());
+  else
+    update = static_cast<const Dtype*>(diff_->cpu_data());
+  
   int update_idx = 0;
   for (int r = 0; r < Caffe::num_rows_per_table(); ++r) {
     petuum::UpdateBatch<Dtype> update_batch(global_table_row_capacity_);
@@ -605,8 +603,32 @@ void Blob<Dtype>::UpdatePSTable() {
 
 template <typename Dtype>
 void Blob<Dtype>::SyncWithPSTable(const int clock) {
-  
+  CHECK(global_table_ptr_);
 
+  vector<vector<Dtype> > row_caches(Caffe::num_rows_per_table());
+  for (int r_idx = 0; r_idx < Caffe::num_rows_per_table(); ++r_idx) {
+    row_caches[r_idx].resize(global_table_row_capacity_);
+    petuum::RowAccessor row_acc;
+    // LOG(INFO) << "get clock " << clock << " count " << count_ 
+    //           << " height " << height_ << " width " << width_ 
+    //           << " channel " << channels_ << " num " << num_;
+    const auto& r = global_table_ptr_->template Get<petuum::DenseRow<Dtype> >(
+                      r_idx, &row_acc, clock);
+    r.CopyToVector(&row_caches[r_idx]);
+    LOG(INFO) << "get done";
+  }
+
+  // TODO: Copy to CPU, could be slow.
+  Dtype* data = mutable_cpu_data();
+  int data_idx = 0;
+  for (int r_idx = 0; r_idx < Caffe::num_rows_per_table(); ++r_idx) {
+    for (int i = 0; i < global_table_row_capacity_; ++i) {
+      data[data_idx] = row_caches[r_idx][i];
+      ++data_idx;
+      if (data_idx >= count_) { break; }
+    }
+    if (data_idx >= count_) { break; }
+  } 
 }
 
 INSTANTIATE_CLASS(Blob);

@@ -276,7 +276,7 @@ class Blob {
    */
   void CreatePSTable(int global_id);
   /* @brief Upload the diff_ to PSTable */
-  void UpdatePSTable();
+  void UpdatePSTable(bool is_data = false);
   /* @brief Download data_ from PSTable */
   void SyncWithPSTable(const int clock);
 

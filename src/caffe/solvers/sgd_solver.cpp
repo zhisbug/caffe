@@ -112,7 +112,7 @@ void SGDSolver<Dtype>::ApplyUpdate() {
     Regularize(param_id);
     ComputeUpdateValue(param_id, rate);
   }
-  this->net_->Update();
+  // this->net_->Update();
 }
 
 template <typename Dtype>

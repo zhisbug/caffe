@@ -86,11 +86,13 @@ void Solver<Dtype>::InitPS() {
   CHECK(Caffe::root_solver()) << "InitPS can only be called by root_solver.";
   
   // -------- Init Table Group
-  auto layers = net_->layers();
-  int num_tables = 0;
-  for (auto& layer : layers) {
-    num_tables += CountLayerBlobs(layer.get());
-  }
+  // auto layers = net_->layers();
+  // int num_tables = 0;
+  // for (auto& layer : layers) {
+  //   num_tables += CountLayerBlobs(layer.get());
+  // }
+  auto learnable_params = net_->learnable_params();
+  int num_tables = learnable_params.size();
 
   petuum::TableGroupConfig table_group_config;
   petuum::InitTableGroupConfig(&table_group_config, num_tables+1);
@@ -102,17 +104,33 @@ void Solver<Dtype>::InitPS() {
 
   // -------- Init Individual Table
   int global_counter = 0;
-  for (auto& layer : layers) {
-    string type(layer->type());
-    LOG(INFO) << type;
-    auto& blobs = layer->blobs();
-    for (int i = 0; i < CountLayerBlobs(layer.get()); ++i) {
-      blobs[i]->CreatePSTable(global_counter++);
-    }
-  }
+  for (int i = 0; i < learnable_params.size(); i++)
+    learnable_params[i]->CreatePSTable(global_counter++);
+  // for (auto& layer : layers) {
+  //   string type(layer->type());
+  //   LOG(INFO) << type;
+  //   auto& blobs = layer->blobs();
+  //   for (int i = 0; i < CountLayerBlobs(layer.get()); ++i) {
+  //     blobs[i]->CreatePSTable(global_counter++);
+  //   }
+  // }
 
   LOG(INFO) << "Tables get ready";
   petuum::PSTableGroup::CreateTableDone();
+
+  // Upload or Download Params --------
+  if (Caffe::client_id() == 0) {
+    bool is_data = true;
+    for (int i = 0; i < learnable_params.size(); i++) {
+      learnable_params[i]->UpdatePSTable(is_data);
+    }
+    petuum::PSTableGroup::GlobalBarrier();
+  } else {
+    petuum::PSTableGroup::GlobalBarrier();
+    for (int i = 0; i < learnable_params.size(); i++) {
+      learnable_params[i]->SyncWithPSTable(clock_);
+    }
+  }
 }
 
 template <typename Dtype>
@@ -120,24 +138,43 @@ void Solver<Dtype>::SyncWithPS() {
   if (!Caffe::root_solver())
     return;
 
-  LOG(INFO) << "SyncWithPS";
+  auto learnable_params = net_->learnable_params();
 
-  auto layers = net_->layers();
-  for (auto& layer : layers) {
-    string type(layer->type());
-    LOG(INFO) << type;
-    auto& blobs = layer->blobs();
-    for (int i = 0; i < CountLayerBlobs(layer.get()); ++i) {
-      blobs[i]->UpdatePSTable();
-      // blobs[i]->SyncWithPSTable(clock+1);
-    }
+  LOG(INFO) << "Upload diff";
+
+  for (int i = 0; i < learnable_params.size(); i++) {
+    learnable_params[i]->UpdatePSTable();
   }
 
-  LOG(FATAL) << "------------------------";
+  // auto layers = net_->layers();
+  // for (auto& layer : layers) {
+  //   string type(layer->type());
+  //   LOG(INFO) << type;
+  //   auto& blobs = layer->blobs();
+  //   for (int i = 0; i < CountLayerBlobs(layer.get()); ++i) {
+  //     blobs[i]->UpdatePSTable();
+  //   }
+  // }
 
-  // petuum::PSTableGroup::GlobalBarrier();
-
+  LOG(INFO) << "petuum::PSTableGroup::Clock()";
   petuum::PSTableGroup::Clock();
+  clock_++;
+
+  LOG(INFO) << "Download Params";
+
+  for (int i = 0; i < learnable_params.size(); i++) {
+    learnable_params[i]->SyncWithPSTable(clock_);
+  }
+  // for (auto& layer : layers) {
+  //   string type(layer->type());
+  //   LOG(INFO) << type;
+  //   auto& blobs = layer->blobs();
+  //   for (int i = 0; i < CountLayerBlobs(layer.get()); ++i) {
+  //     blobs[i]->SyncWithPSTable(clock_);
+  //   }
+  // }
+
+  // LOG(FATAL) << "------------------------";
 }
 
 template <typename Dtype>
@@ -328,8 +365,8 @@ void Solver<Dtype>::Step(int iters) {
       callbacks_[i]->on_gradients_ready();
     }
 
+    ApplyUpdate(); // changed to only modify diff_
     SyncWithPS();
-    // ApplyUpdate();
 
     // Increment the internal iter_ counter -- its value should always indicate
     // the number of times the weights have been updated.
