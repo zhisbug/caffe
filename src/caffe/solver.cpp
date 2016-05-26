@@ -95,7 +95,7 @@ void Solver<Dtype>::InitPS() {
   int num_tables = learnable_params.size();
 
   petuum::TableGroupConfig table_group_config;
-  petuum::InitTableGroupConfig(&table_group_config, num_tables+1);
+  petuum::InitTableGroupConfig(&table_group_config, num_tables);
   petuum::PSTableGroup::RegisterRow<petuum::DenseRow<Dtype> >
     (caffe::kDenseRowDtypeID);
  
@@ -117,7 +117,6 @@ void Solver<Dtype>::InitPS() {
 
   LOG(INFO) << "Tables get ready";
   petuum::PSTableGroup::CreateTableDone();
-  LOG(INFO) << "Tables get ready";
 
   // -------- Set Inidividual Table
   for (int i = 0; i < learnable_params.size(); i++)
@@ -145,7 +144,7 @@ void Solver<Dtype>::SyncWithPS() {
 
   auto learnable_params = net_->learnable_params();
 
-  LOG(INFO) << "Upload diff";
+  // LOG(INFO) << "Upload diff";
 
   for (int i = 0; i < learnable_params.size(); i++) {
     learnable_params[i]->UpdatePSTable();
@@ -161,11 +160,11 @@ void Solver<Dtype>::SyncWithPS() {
   //   }
   // }
 
-  LOG(INFO) << "petuum::PSTableGroup::Clock()";
+  // LOG(INFO) << "petuum::PSTableGroup::Clock()";
   petuum::PSTableGroup::Clock();
   clock_++;
 
-  LOG(INFO) << "Download Params";
+  // LOG(INFO) << "Download Params";
 
   for (int i = 0; i < learnable_params.size(); i++) {
     learnable_params[i]->SyncWithPSTable(clock_);

@@ -621,7 +621,7 @@ void Blob<Dtype>::SyncWithPSTable(const int clock) {
     const auto& r = global_table_ptr_->template Get<petuum::DenseRow<Dtype> >(
                       r_idx, &row_acc, clock);
     r.CopyToVector(&row_caches[r_idx]);
-    LOG(INFO) << "get done";
+    // LOG(INFO) << "get done";
   }
 
   // TODO: Copy to CPU, could be slow.
