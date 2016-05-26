@@ -272,9 +272,10 @@ class Blob {
   inline int global_table_row_capacity() const { return global_table_row_capacity_; }
   inline int global_id() const { return global_id_; }
   /** 
-   * @brief Init Table with global_id. Upload/Download data_.
+   * @brief Init Table with global_id. 
    */
   void CreatePSTable(int global_id);
+  void SetPSTable();
   /* @brief Upload the diff_ to PSTable */
   void UpdatePSTable(bool is_data = false);
   /* @brief Download data_ from PSTable */

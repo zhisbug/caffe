@@ -1,4 +1,4 @@
-#include <climits>
+#include <climits> 
 #include <vector>
 
 #include "caffe/blob.hpp"
@@ -566,19 +566,25 @@ void Blob<Dtype>::CreatePSTable(int global_id) {
   table_config.no_oplog_replay = true;
 
   petuum::PSTableGroup::CreateTable(global_id_, table_config);
+  LOG(INFO) << "CreatePSTable: "
+    << "id " << global_id_ << "\t" 
+    << "size " << num_rows_per_table << "x" << global_table_row_capacity_;  
+}
 
+template <typename Dtype>
+void Blob<Dtype>::SetPSTable() {
+  LOG(INFO) << "-----------";
   // Client side PS tables -------- 
   global_table_ = petuum::PSTableGroup::GetTableOrDie<Dtype>(global_id_);
   global_table_ptr_ = &global_table_;
-  for (int ridx = 0; ridx < num_rows_per_table; ++ridx) {
-    global_table_ptr_->GetAsyncForced(ridx);
-  }
-  global_table_ptr_->WaitPendingAsyncGet();
-
-  LOG(INFO) << "CreateTable: "
-    << "id " << global_id << "\t" 
-    << "size " << num_rows_per_table << "x" << global_table_row_capacity_;  
+  // for (int ridx = 0; ridx < Caffe::num_rows_per_table(); ++ridx) {
+  //   global_table_ptr_->GetAsyncForced(ridx);
+  // }
+  // global_table_ptr_->WaitPendingAsyncGet();
+  
+  LOG(INFO) << "SetPSTable: id " << global_id_;
 }
+
 
 template <typename Dtype>
 void Blob<Dtype>::UpdatePSTable(bool is_data) {

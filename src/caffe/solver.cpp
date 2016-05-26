@@ -117,6 +117,11 @@ void Solver<Dtype>::InitPS() {
 
   LOG(INFO) << "Tables get ready";
   petuum::PSTableGroup::CreateTableDone();
+  LOG(INFO) << "Tables get ready";
+
+  // -------- Set Inidividual Table
+  for (int i = 0; i < learnable_params.size(); i++)
+    learnable_params[i]->SetPSTable();
 
   // Upload or Download Params --------
   if (Caffe::client_id() == 0) {
