@@ -78,8 +78,8 @@ class Solver {
   // Invoked at specific points during an iteration
   class Callback {
    protected:
-    virtual void on_start() = 0;
-    virtual void on_gradients_ready() = 0;
+    virtual void on_start(bool sync = true) = 0;
+    virtual void on_gradients_ready(int size = 0, int offset = 0) = 0;
 
     template <typename T>
     friend class Solver;
@@ -99,10 +99,12 @@ class Solver {
   int CountLayerBlobs(Layer<Dtype>*);
   void InitPS();
   void SyncWithPS();
+  Dtype ForwardBackwardWithDWBP();
 
  protected:
   // Make and apply the update value for the current iteration.
   virtual void ApplyUpdate() = 0;
+  virtual void ApplyUpdateParams(vector<int> learnable_params_id) { LOG(FATAL) << "Not Overrided!"; }
   string SnapshotFilename(const string extension);
   string SnapshotToBinaryProto();
   string SnapshotToHDF5();

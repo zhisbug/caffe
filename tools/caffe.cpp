@@ -67,6 +67,8 @@ DEFINE_int32(num_rows_per_table, 1,
     "Petuum params.");
 DEFINE_bool(svb, false,
     "Petuum params.");
+DEFINE_bool(dwbp, true,
+    "Petuum params.");
 
 // A simple registry for caffe commands.
 typedef int (*BrewFunction)();
@@ -226,6 +228,7 @@ int train() {
   Caffe::set_num_rows_per_table(FLAGS_num_rows_per_table);
   Caffe::set_svb(FLAGS_svb);
   Caffe::set_table_staleness(FLAGS_table_staleness); 
+  Caffe::set_dwbp(FLAGS_dwbp);
 
   // petuum::ClientTableConfig table_config;
   // petuum::InitTableConfig(&table_config);

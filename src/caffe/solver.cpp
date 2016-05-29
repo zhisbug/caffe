@@ -10,6 +10,7 @@
 #include "caffe/util/io.hpp"
 #include "caffe/util/upgrade_proto.hpp"
 
+#include <thread>
 #include <petuum_ps_common/include/petuum_ps.hpp>
 #include <petuum_ps_common/include/system_gflags_declare.hpp>
 #include <petuum_ps_common/include/init_table_group_config.hpp>
@@ -129,12 +130,12 @@ void Solver<Dtype>::InitPS() {
       learnable_params[i]->UpdatePSTable(is_data);
     }
     petuum::PSTableGroup::GlobalBarrier();
-    clock_ += Caffe::table_stateness() + 1;
+    clock_ += Caffe::table_staleness() + 1;
   } else {
     petuum::PSTableGroup::GlobalBarrier();
     for (int i = 0; i < learnable_params.size(); i++) {
       learnable_params[i]->SyncWithPSTable(clock_);
-      clock_ += Caffe::table_stateness() + 1;
+      clock_ += Caffe::table_staleness() + 1;
     }
   }
 }
@@ -148,8 +149,10 @@ void Solver<Dtype>::SyncWithPS() {
 
   // LOG(INFO) << "Upload diff";
 
-  for (int i = 0; i < learnable_params.size(); i++) {
-    learnable_params[i]->UpdatePSTable();
+  if (!Caffe::dwbp()) {
+    for (int i = 0; i < learnable_params.size(); i++) {
+      learnable_params[i]->UpdatePSTable();
+    }
   }
 
   // auto layers = net_->layers();
@@ -311,6 +314,49 @@ void Solver<Dtype>::InitTestNets() {
 }
 
 template <typename Dtype>
+Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
+  LOG(FATAL) << "-----------------";
+  Dtype loss;
+  net_->Forward(&loss);
+
+  auto& layers = net_->layers();
+  vector<std::thread> threads;
+  auto& learnable_params = net_->learnable_params();
+  for (int i = layers.size()-1; i >= 0; --i) {
+    net_->BackwardFromTo(i, i); // Backward layer i
+    auto learnable_params_id = layers[i]->learnable_params_id();
+    if (learnable_params_id.empty())
+      continue;
+
+    int size = 0, offset = 0;
+    for (int i: learnable_params_id)
+      size += learnable_params[i]->count();
+    for (int i = 0; i < learnable_params_id[0]; ++i)
+      offset += learnable_params[i]->count();
+
+    // Aggregate diffs of learnable params in layer i to root
+    CHECK(size>0) << "Trying to sync with size = 0";
+    for (int i = 0; i < callbacks_.size(); ++i)
+      callbacks_[i]->on_gradients_ready(size, offset);
+    for (int i = 0; i < callbacks_.size(); ++i)
+      callbacks_[i]->on_start(false);
+
+    // diff = diff * lr
+    ApplyUpdateParams(learnable_params_id);
+
+    for (int i : learnable_params_id) {
+      threads.push_back(std::thread(&Blob<Dtype>::UpdatePSTable, learnable_params[i], false));
+    }
+  
+    
+  }
+
+  for (auto& t : threads)
+    t.join();
+
+  return loss;
+}
+template <typename Dtype>
 void Solver<Dtype>::Step(int iters) {
   const int start_iter = iter_;
   const int stop_iter = iter_ + iters;
@@ -339,7 +385,10 @@ void Solver<Dtype>::Step(int iters) {
     // accumulate the loss and gradient
     Dtype loss = 0;
     for (int i = 0; i < param_.iter_size(); ++i) {
-      loss += net_->ForwardBackward();
+      if (Caffe::dwbp())
+        loss += net_->ForwardBackward();
+      else
+        loss += ForwardBackwardWithDWBP();
     }
     loss /= param_.iter_size();
     // average the loss across iterations for smoothed reporting
@@ -367,11 +416,13 @@ void Solver<Dtype>::Step(int iters) {
         }
       }
     }
-    for (int i = 0; i < callbacks_.size(); ++i) {
-      callbacks_[i]->on_gradients_ready();
-    }
 
-    ApplyUpdate(); // changed to only modify diff_
+    if (!Caffe::dwbp) {
+      for (int i = 0; i < callbacks_.size(); ++i) {
+        callbacks_[i]->on_gradients_ready();
+      }
+      ApplyUpdate(); // changed to only modify diff_
+    }
     SyncWithPS();
 
     // Increment the internal iter_ counter -- its value should always indicate

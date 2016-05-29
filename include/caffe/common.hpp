@@ -170,12 +170,14 @@ class Caffe {
   inline static bool svb() { return Get().svb_; }
   inline static int table_staleness() { return Get().table_staleness_; }
   inline static int client_id() {return Get().client_id_; }
+  inline static bool dwbp() { return Get().dwbp_; }
 
   inline static void set_net_outputs(string s) { Get().net_outputs_ = s; }
   inline static void set_num_rows_per_table(int val) { Get().num_rows_per_table_ = val; }
   inline static void set_svb(int val) { Get().svb_ = val; }
   inline static void set_table_staleness(int val) { Get().table_staleness_ = val; }
   inline static void set_client_id(int val) { Get().client_id_ = val; }
+  inline static void set_dwbp(bool val) { Get().dwbp_ = val; }
 
  protected:
 #ifndef CPU_ONLY
@@ -194,6 +196,7 @@ class Caffe {
   int num_rows_per_table_;
   bool svb_;
   int table_staleness_;
+  bool dwbp_;
 
  private:
   // The private constructor to avoid duplicate instantiation.
