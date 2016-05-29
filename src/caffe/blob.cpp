@@ -589,16 +589,20 @@ void Blob<Dtype>::SetPSTable() {
 template <typename Dtype>
 void Blob<Dtype>::UpdatePSTable(bool is_data) {
   const Dtype* update;
-  if (is_data)
+  Dtype multiplier;
+  if (is_data) {
     update = static_cast<const Dtype*>(data_->cpu_data());
-  else
+    multiplier = Dtype(1);
+  } else {
     update = static_cast<const Dtype*>(diff_->cpu_data());
+    multiplier = Dtype(-1);
+  }
   
   int update_idx = 0;
   for (int r = 0; r < Caffe::num_rows_per_table(); ++r) {
     petuum::UpdateBatch<Dtype> update_batch(global_table_row_capacity_);
     for (int i = 0; i < global_table_row_capacity_; ++i) {
-      update_batch.UpdateSet(i, i, Dtype(-1) * update[update_idx]);
+      update_batch.UpdateSet(i, i, multiplier * update[update_idx]);
       ++update_idx;
       if (update_idx >= count_) { break; }
     }

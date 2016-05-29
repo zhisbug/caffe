@@ -129,10 +129,12 @@ void Solver<Dtype>::InitPS() {
       learnable_params[i]->UpdatePSTable(is_data);
     }
     petuum::PSTableGroup::GlobalBarrier();
+    clock_ += Caffe::table_stateness() + 1;
   } else {
     petuum::PSTableGroup::GlobalBarrier();
     for (int i = 0; i < learnable_params.size(); i++) {
       learnable_params[i]->SyncWithPSTable(clock_);
+      clock_ += Caffe::table_stateness() + 1;
     }
   }
 }
