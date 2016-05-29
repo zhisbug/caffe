@@ -334,6 +334,8 @@ void P2PSync<Dtype>::on_gradients_ready(int size, int offset) {
 
   if (size == 0)
     size = size_;
+  if (size == -1)
+    size = 0;
 
   // Sum children gradients as they appear in the queue
   for (int i = 0; i < children_.size(); ++i) {

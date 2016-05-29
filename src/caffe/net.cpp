@@ -472,6 +472,7 @@ void Net<Dtype>::AppendParam(const NetParameter& param, const int layer_id,
 
     // poseidon --------
     layers_[layer_id]->push_learnable_params_id(learnable_param_id);
+    LOG(INFO) << "@@@ id: " << layer_id << "\tlearnable_param_id: " << learnable_param_id;
 
     has_params_lr_.push_back(param_spec->has_lr_mult());
     has_params_decay_.push_back(param_spec->has_decay_mult());

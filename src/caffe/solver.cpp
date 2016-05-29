@@ -315,7 +315,6 @@ void Solver<Dtype>::InitTestNets() {
 
 template <typename Dtype>
 Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
-  LOG(FATAL) << "-----------------";
   Dtype loss;
   net_->Forward(&loss);
 
@@ -323,6 +322,8 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
   vector<std::thread> threads;
   auto& learnable_params = net_->learnable_params();
   for (int i = layers.size()-1; i >= 0; --i) {
+    // LOG(INFO) << "@@@ Layer " << layers[i]->type();
+
     net_->BackwardFromTo(i, i); // Backward layer i
     auto learnable_params_id = layers[i]->learnable_params_id();
     if (learnable_params_id.empty())
@@ -333,6 +334,11 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
       size += learnable_params[i]->count();
     for (int i = 0; i < learnable_params_id[0]; ++i)
       offset += learnable_params[i]->count();
+
+    // LOG(INFO) << "@@@ layer_id: " << i 
+    //   << "\tsize: " << size 
+    //   << "\toffset: " << offset
+    //   << "\tlpid: " << learnable_params_id[0];
 
     // Aggregate diffs of learnable params in layer i to root
     CHECK(size>0) << "Trying to sync with size = 0";
@@ -347,15 +353,16 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
     for (int i : learnable_params_id) {
       threads.push_back(std::thread(&Blob<Dtype>::UpdatePSTable, learnable_params[i], false));
     }
-  
-    
   }
 
   for (auto& t : threads)
     t.join();
 
+  // LOG(FATAL) << "-----------------------";
+
   return loss;
 }
+
 template <typename Dtype>
 void Solver<Dtype>::Step(int iters) {
   const int start_iter = iter_;
@@ -386,9 +393,9 @@ void Solver<Dtype>::Step(int iters) {
     Dtype loss = 0;
     for (int i = 0; i < param_.iter_size(); ++i) {
       if (Caffe::dwbp())
-        loss += net_->ForwardBackward();
-      else
         loss += ForwardBackwardWithDWBP();
+      else
+        loss += net_->ForwardBackward();
     }
     loss /= param_.iter_size();
     // average the loss across iterations for smoothed reporting
@@ -421,7 +428,12 @@ void Solver<Dtype>::Step(int iters) {
       for (int i = 0; i < callbacks_.size(); ++i) {
         callbacks_[i]->on_gradients_ready();
       }
-      ApplyUpdate(); // changed to only modify diff_
+      ApplyUpdate(); // diff_ = diff_ * lr
+    } else {
+      // dummy callbacks, only modify queue_
+      for (int i = 0; i < callbacks_.size(); ++i) {
+        callbacks_[i]->on_gradients_ready(-1);
+      }
     }
     SyncWithPS();
 
