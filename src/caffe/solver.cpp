@@ -1,13 +1,15 @@
 #include <cstdio>
-
+#include <cuda_runtime.h>
 #include <string>
 #include <vector>
+#include <thread>
 
 #include "caffe/solver.hpp"
 #include "caffe/util/format.hpp"
 #include "caffe/util/hdf5.hpp"
 #include "caffe/util/io.hpp"
 #include "caffe/util/upgrade_proto.hpp"
+#include "caffe/util/benchmark.hpp"
 
 namespace caffe {
 
@@ -219,7 +221,7 @@ void Solver<Dtype>::Step(int iters) {
     // accumulate the loss and gradient
     Dtype loss = 0;
     for (int i = 0; i < param_.iter_size(); ++i) {
-      loss += net_->ForwardBackward();
+        loss += ForwardBackwardWithDWBP();
     }
     loss /= param_.iter_size();
     // average the loss across iterations for smoothed reporting
@@ -247,11 +249,6 @@ void Solver<Dtype>::Step(int iters) {
         }
       }
     }
-    for (int i = 0; i < callbacks_.size(); ++i) {
-      callbacks_[i]->on_gradients_ready();
-    }
-    ApplyUpdate();
-
     // Increment the internal iter_ counter -- its value should always indicate
     // the number of times the weights have been updated.
     ++iter_;
@@ -271,6 +268,67 @@ void Solver<Dtype>::Step(int iters) {
       break;
     }
   }
+}
+
+template <typename Dtype>
+Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
+  Timer tim = Timer();
+  Dtype loss;
+  net_->Forward(&loss);
+
+  auto layers = net_->layers();
+  vector<std::thread> threads;
+  //auto& learnable_params = net_->learnable_params();
+  tim.Start();
+  for (int i = layers.size() - 1; i >= 0; --i) {
+    // LOG(INFO) << "@@@ Layer " << layers[i]->type();
+
+    net_->BackwardFromTo(i, i); // Backward layer i
+    vector<int> learnable_params_id = layers[i]->learnable_params_id();
+    if (learnable_params_id.empty())
+      continue;
+
+    // A separate thread to sync grads/params
+    //threads.push_back(std::thread(&Solver<Dtype>::AsyncGradGPUs, this, learnable_params_id));
+  }
+  tim.Stop();
+
+  if (Caffe::root_solver()) 
+    LOG(INFO) << "DWBP compute: " << tim.Seconds();
+
+
+  //tim.Start();
+  //for (int i = 0; i < threads.size(); ++i)
+  //  threads[i].join();
+  //tim.Stop();
+  //if (Caffe::root_solver()) 
+  //  LOG(INFO) << "DWBP: " << tim.Seconds();
+  return loss;
+}
+
+// DWBP: collect gradients for the finished layer, and sync new paramters for all GPUs
+template <typename Dtype>
+void Solver<Dtype>::AsyncGradGPUs(const vector<int> learnable_params_id) {
+  CUDA_CHECK(cudaSetDevice(this->param_.device_id()));
+  int size = 0, offset = 0;
+  for (int i = 0; i < learnable_params_id.size(); ++i) {
+    size += net_->learnable_params()[learnable_params_id[i]]->count();
+  }
+  for (int i = 0; i < learnable_params_id[0]; ++i) {
+    offset += net_->learnable_params()[i] ->count();   
+  }
+
+  CHECK(size > 0) << "Trying to sync with size = 0";
+  // The root solver collects gradients
+  for (int i = 0; i < callbacks_.size(); ++i)
+    callbacks_[i]->on_gradients_ready(size, offset);
+
+  // Regularize the graidents at the root solver, and apply the updates 
+  ApplyUpdateParams(learnable_params_id);
+
+  // Copy updated parameters to worker solvers 
+  for (int i = 0; i < callbacks_.size(); ++i)
+    callbacks_[i]->on_start(size, offset);
 }
 
 template <typename Dtype>

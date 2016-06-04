@@ -47,6 +47,8 @@ DEFINE_string(sigint_effect, "stop",
 DEFINE_string(sighup_effect, "snapshot",
              "Optional; action to take when a SIGHUP signal is received: "
              "snapshot, stop or none.");
+DEFINE_bool(dwbp, false, "Enable DWBP or not?");
+
 
 // A simple registry for caffe commands.
 typedef int (*BrewFunction)();
@@ -199,7 +201,7 @@ int train() {
   caffe::SignalHandler signal_handler(
         GetRequestedAction(FLAGS_sigint_effect),
         GetRequestedAction(FLAGS_sighup_effect));
-
+  
   shared_ptr<caffe::Solver<float> >
       solver(caffe::SolverRegistry<float>::CreateSolver(solver_param));
 

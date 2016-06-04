@@ -99,8 +99,8 @@ class P2PSync : public GPUParams<Dtype>, public Solver<Dtype>::Callback,
   inline const int initial_iter() const { return initial_iter_; }
 
  protected:
-  void on_start();
-  void on_gradients_ready();
+  void on_start(int size = 0, int offset = 0);
+  void on_gradients_ready(int size = 0, int offset= 0);
 
   void InternalThreadEntry();
 

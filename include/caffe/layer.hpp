@@ -315,9 +315,14 @@ class Layer {
     }
     param_propagate_down_[param_id] = value;
   }
-
+ 
+  inline vector<int> learnable_params_id() { return learnable_params_id_; }
+  inline void push_learnable_params_id(int i) { learnable_params_id_.push_back(i); }
 
  protected:
+  // DWBP
+  vector<int> learnable_params_id_;
+
   /** The protobuf that stores the layer parameters */
   LayerParameter layer_param_;
   /** The phase: TRAIN or TEST */

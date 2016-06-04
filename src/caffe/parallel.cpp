@@ -284,7 +284,7 @@ void P2PSync<Dtype>::InternalThreadEntry() {
 }
 
 template<typename Dtype>
-void P2PSync<Dtype>::on_start() {
+void P2PSync<Dtype>::on_start(int size, int offset) {
 #ifndef CPU_ONLY
 #ifdef DEBUG
   int device;
@@ -293,6 +293,11 @@ void P2PSync<Dtype>::on_start() {
 #else
 //  CHECK(false);
 #endif
+  
+  if (size == 0)
+    size = size_;
+  if (size == -1)
+    size = 0;
 
   // Wait for update from parent
   if (parent_) {
@@ -313,7 +318,7 @@ void P2PSync<Dtype>::on_start() {
     CHECK(attributes.device == children_[i]->solver_->param().device_id());
 #endif
 
-    CUDA_CHECK(cudaMemcpyAsync(dst, src, size_ * sizeof(Dtype),
+    CUDA_CHECK(cudaMemcpyAsync(dst + offset, src + offset, size * sizeof(Dtype),
         cudaMemcpyDeviceToDevice, cudaStreamDefault));
     CUDA_CHECK(cudaStreamSynchronize(cudaStreamDefault));
     children_[i]->queue_.push(this);
@@ -322,13 +327,18 @@ void P2PSync<Dtype>::on_start() {
 }
 
 template<typename Dtype>
-void P2PSync<Dtype>::on_gradients_ready() {
+void P2PSync<Dtype>::on_gradients_ready(int size, int offset) {
 #ifndef CPU_ONLY
 #ifdef DEBUG
   int device;
   CUDA_CHECK(cudaGetDevice(&device));
   CHECK(device == solver_->param().device_id());
 #endif
+
+  if (size == 0)
+    size = size_;
+  if (size == -1)
+    size = 0;
 
   // Sum children gradients as they appear in the queue
   for (int i = 0; i < children_.size(); ++i) {
@@ -351,7 +361,7 @@ void P2PSync<Dtype>::on_gradients_ready() {
     CHECK(attributes.device == device);
 #endif
 
-    caffe_gpu_add(size_, src, dst, dst);
+    caffe_gpu_add(size, src + offset, dst + offset, dst + offset);
   }
 
   // Send gradients to parent
@@ -367,14 +377,14 @@ void P2PSync<Dtype>::on_gradients_ready() {
     CHECK(attributes.device == parent_->solver_->param().device_id());
 #endif
 
-    CUDA_CHECK(cudaMemcpyAsync(dst, src, size_ * sizeof(Dtype),  //
+    CUDA_CHECK(cudaMemcpyAsync(dst + offset, src + offset, size * sizeof(Dtype),  //
         cudaMemcpyDeviceToDevice, cudaStreamDefault));
     CUDA_CHECK(cudaStreamSynchronize(cudaStreamDefault));
     parent_->queue_.push(this);
   } else {
     // Loss functions divide gradients by the batch size, so to compensate
     // for split batch, the root solver divides by number of solvers.
-    caffe_gpu_scal(size_, Dtype(1.0 / Caffe::solver_count()), diff_);
+    caffe_gpu_scal(size, Dtype(1.0 / Caffe::solver_count()), diff_ + offset);
   }
 #endif
 }

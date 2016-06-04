@@ -77,8 +77,8 @@ class Solver {
   // Invoked at specific points during an iteration
   class Callback {
    protected:
-    virtual void on_start() = 0;
-    virtual void on_gradients_ready() = 0;
+    virtual void on_start(int size = 0, int offset = 0) = 0;
+    virtual void on_gradients_ready(int size = 0, int offset = 0) = 0;
 
     template <typename T>
     friend class Solver;
@@ -94,9 +94,14 @@ class Solver {
    */
   virtual inline const char* type() const { return ""; }
 
+  //dwbp
+  Dtype ForwardBackwardWithDWBP();
+  void AsyncGradGPUs(const vector<int> learnable_params_id);
+
  protected:
   // Make and apply the update value for the current iteration.
   virtual void ApplyUpdate() = 0;
+  virtual void ApplyUpdateParams(const vector<int> learnable_params_id) { LOG(FATAL) << "Not Overrided!"; } 
   string SnapshotFilename(const string extension);
   string SnapshotToBinaryProto();
   string SnapshotToHDF5();
@@ -145,6 +150,7 @@ class WorkerSolver : public Solver<Dtype> {
 
  protected:
   void ApplyUpdate() {}
+  void ApplyUpdateParams(const vector<int> learnable_params_id) {}
   void SnapshotSolverState(const string& model_filename) {
     LOG(FATAL) << "Should not be called on worker solver.";
   }

@@ -163,7 +163,7 @@ class Caffe {
   inline static void set_solver_count(int val) { Get().solver_count_ = val; }
   inline static bool root_solver() { return Get().root_solver_; }
   inline static void set_root_solver(bool val) { Get().root_solver_ = val; }
-
+  
  protected:
 #ifndef CPU_ONLY
   cublasHandle_t cublas_handle_;
