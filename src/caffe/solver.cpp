@@ -57,6 +57,9 @@ void Solver<Dtype>::Init(const SolverParameter& param) {
   }
   // Scaffolding code
   InitTrainNet();
+  for (int i = 0; i < callbacks_.size(); ++i)
+    callbacks_[i]->init_dwbp_queue(net_->learnable_params().size());
+
   if (Caffe::root_solver()) {
     InitTestNets();
     LOG(INFO) << "Solver scaffolding done.";

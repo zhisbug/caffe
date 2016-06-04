@@ -102,11 +102,16 @@ class P2PSync : public GPUParams<Dtype>, public Solver<Dtype>::Callback,
   void on_start(int size = 0, int offset = 0);
   void on_gradients_ready(int size = 0, int offset= 0);
 
+  void init_dwbp_queue(int learnable_params_num) {
+    dwbp_queue_.resize(learnable_params_num);
+  }
+
   void InternalThreadEntry();
 
   P2PSync<Dtype>* parent_;
   vector<P2PSync<Dtype>*> children_;
   BlockingQueue<P2PSync<Dtype>*> queue_;
+  vector<TSQueue<P2PSync<Dtype>*>> dwbp_queue_;
   const int initial_iter_;
   Dtype* parent_grads_;
   shared_ptr<Solver<Dtype> > solver_;

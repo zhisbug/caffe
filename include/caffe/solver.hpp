@@ -79,6 +79,7 @@ class Solver {
    protected:
     virtual void on_start(int size = 0, int offset = 0) = 0;
     virtual void on_gradients_ready(int size = 0, int offset = 0) = 0;
+    virtual void init_dwbp_queue(int learnable_params_num) = 0;
 
     template <typename T>
     friend class Solver;
