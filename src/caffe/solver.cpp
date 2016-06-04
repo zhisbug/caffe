@@ -216,9 +216,10 @@ void Solver<Dtype>::Step(int iters) {
       }
     }
 
-    for (int i = 0; i < callbacks_.size(); ++i) {
-      callbacks_[i]->on_start();
-    }
+    // Don't need; Sync has been down at DWBP
+    // for (int i = 0; i < callbacks_.size(); ++i) {
+    //   callbacks_[i]->on_start();
+    // }
     const bool display = param_.display() && iter_ % param_.display() == 0;
     net_->set_debug_info(display && param_.debug_info());
     // accumulate the loss and gradient
@@ -292,7 +293,7 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
       continue;
 
     // A separate thread to sync grads/params
-    //threads.push_back(std::thread(&Solver<Dtype>::AsyncGradGPUs, this, learnable_params_id));
+    threads.push_back(std::thread(&Solver<Dtype>::AsyncGradGPUs, this, learnable_params_id));
   }
   tim.Stop();
 
@@ -301,8 +302,8 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
 
 
   //tim.Start();
-  //for (int i = 0; i < threads.size(); ++i)
-  //  threads[i].join();
+  for (int i = 0; i < threads.size(); ++i)
+    threads[i].join();
   //tim.Stop();
   //if (Caffe::root_solver()) 
   //  LOG(INFO) << "DWBP: " << tim.Seconds();
@@ -324,14 +325,14 @@ void Solver<Dtype>::AsyncGradGPUs(const vector<int> learnable_params_id) {
   CHECK(size > 0) << "Trying to sync with size = 0";
   // The root solver collects gradients
   for (int i = 0; i < callbacks_.size(); ++i)
-    callbacks_[i]->on_gradients_ready(size, offset);
+    callbacks_[i]->on_gradients_ready(size, offset, learnable_params_id[0]);
 
   // Regularize the graidents at the root solver, and apply the updates 
   ApplyUpdateParams(learnable_params_id);
 
   // Copy updated parameters to worker solvers 
   for (int i = 0; i < callbacks_.size(); ++i)
-    callbacks_[i]->on_start(size, offset);
+    callbacks_[i]->on_start(size, offset, learnable_params_id[0]);
 }
 
 template <typename Dtype>

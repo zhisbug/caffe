@@ -77,8 +77,8 @@ class Solver {
   // Invoked at specific points during an iteration
   class Callback {
    protected:
-    virtual void on_start(int size = 0, int offset = 0) = 0;
-    virtual void on_gradients_ready(int size = 0, int offset = 0) = 0;
+    virtual void on_start(int size = 0, int offset = 0, int param_id = -1) = 0;
+    virtual void on_gradients_ready(int size = 0, int offset = 0, int param_id = -1) = 0;
     virtual void init_dwbp_queue(int learnable_params_num) = 0;
 
     template <typename T>

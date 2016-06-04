@@ -284,7 +284,7 @@ void P2PSync<Dtype>::InternalThreadEntry() {
 }
 
 template<typename Dtype>
-void P2PSync<Dtype>::on_start(int size, int offset) {
+void P2PSync<Dtype>::on_start(int size, int offset, int param_id) {
 #ifndef CPU_ONLY
 #ifdef DEBUG
   int device;
@@ -301,7 +301,7 @@ void P2PSync<Dtype>::on_start(int size, int offset) {
 
   // Wait for update from parent
   if (parent_) {
-    P2PSync<Dtype> *parent = queue_.pop();
+    P2PSync<Dtype> *parent = dwbp_queue_[param_id]->pop();
     CHECK(parent == parent_);
   }
 
@@ -321,13 +321,13 @@ void P2PSync<Dtype>::on_start(int size, int offset) {
     CUDA_CHECK(cudaMemcpyAsync(dst + offset, src + offset, size * sizeof(Dtype),
         cudaMemcpyDeviceToDevice, cudaStreamDefault));
     CUDA_CHECK(cudaStreamSynchronize(cudaStreamDefault));
-    children_[i]->queue_.push(this);
+    children_[i]->dwbp_queue_[param_id]->push(this);
   }
 #endif
 }
 
 template<typename Dtype>
-void P2PSync<Dtype>::on_gradients_ready(int size, int offset) {
+void P2PSync<Dtype>::on_gradients_ready(int size, int offset, int param_id) {
 #ifndef CPU_ONLY
 #ifdef DEBUG
   int device;
@@ -342,7 +342,7 @@ void P2PSync<Dtype>::on_gradients_ready(int size, int offset) {
 
   // Sum children gradients as they appear in the queue
   for (int i = 0; i < children_.size(); ++i) {
-    P2PSync<Dtype> *child = queue_.pop();
+    P2PSync<Dtype> *child = dwbp_queue_[param_id]->pop();
     Dtype* src = child->parent_grads_;
     Dtype* dst = diff_;
 
@@ -380,7 +380,7 @@ void P2PSync<Dtype>::on_gradients_ready(int size, int offset) {
     CUDA_CHECK(cudaMemcpyAsync(dst + offset, src + offset, size * sizeof(Dtype),  //
         cudaMemcpyDeviceToDevice, cudaStreamDefault));
     CUDA_CHECK(cudaStreamSynchronize(cudaStreamDefault));
-    parent_->queue_.push(this);
+    parent_->dwbp_queue_[param_id]->push(this);
   } else {
     // Loss functions divide gradients by the batch size, so to compensate
     // for split batch, the root solver divides by number of solvers.
