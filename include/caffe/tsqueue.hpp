@@ -4,7 +4,7 @@
 #include <condition_variable>
  
 template <typename T>
-class Queue
+class TSQueue
 {
  public:
  
