@@ -103,11 +103,17 @@ class P2PSync : public GPUParams<Dtype>, public Solver<Dtype>::Callback,
   void on_start(int size = 0, int offset = 0, int param_id = -1);
   void on_gradients_ready(int size = 0, int offset= 0, int param_id = -1);
 
-  void init_dwbp_queue(int learnable_params_num) {
-    for (int i = 0; i < learnable_params_num; ++i)
-      dwbp_queue_.push_back(new BlockingQueue<P2PSync<Dtype>*>());
-    // dwbp_queue_.resize(learnable_params_num);
-  }
+  void init_dwbp_queue(int learnable_params_num); 
+//   {
+//     LOG(INFO) << "Here";
+//     for (int i = 0; i < learnable_params_num; ++i)
+//       dwbp_queue_.push_back(new BlockingQueue<P2PSync<Dtype>*>());
+//     // dwbp_queue_.resize(learnable_params_num);
+//     
+//     LOG(INFO) << "Here";
+//     LOG(INFO) << dwbp_queue_.size();
+//     LOG(FATAL) << "------------";
+//   }
 
   void InternalThreadEntry();
 

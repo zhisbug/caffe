@@ -57,8 +57,6 @@ void Solver<Dtype>::Init(const SolverParameter& param) {
   }
   // Scaffolding code
   InitTrainNet();
-  for (int i = 0; i < callbacks_.size(); ++i)
-    callbacks_[i]->init_dwbp_queue(net_->learnable_params().size());
 
   if (Caffe::root_solver()) {
     InitTestNets();
@@ -203,13 +201,14 @@ void Solver<Dtype>::Step(int iters) {
   losses_.clear();
   smoothed_loss_ = 0;
 
+  double eps = 0;
   while (iter_ < stop_iter) {
     // zero-init the params
     net_->ClearParamDiffs();
     if (param_.test_interval() && iter_ % param_.test_interval() == 0
         && (iter_ > 0 || param_.test_initialization())
         && Caffe::root_solver()) {
-      TestAll();
+      // TestAll();
       if (requested_early_exit_) {
         // Break out of the while loop because stop was requested while testing.
         break;
@@ -225,7 +224,16 @@ void Solver<Dtype>::Step(int iters) {
     // accumulate the loss and gradient
     Dtype loss = 0;
     for (int i = 0; i < param_.iter_size(); ++i) {
-        loss += ForwardBackwardWithDWBP();
+      Timer tim = Timer();
+      tim.Start();
+      loss += ForwardBackwardWithDWBP();
+      tim.Stop();
+      eps += tim.Seconds();
+
+      if (Caffe::root_solver() && iter_ % 20 == 19) {
+        LOG(INFO) << "DWBP compute: " << eps;
+        eps = 0;
+      }
     }
     loss /= param_.iter_size();
     // average the loss across iterations for smoothed reporting
@@ -297,8 +305,8 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
   }
   tim.Stop();
 
-  if (Caffe::root_solver()) 
-    LOG(INFO) << "DWBP compute: " << tim.Seconds();
+  // if (Caffe::root_solver()) 
+  //   LOG(INFO) << "DWBP compute: " << tim.Seconds();
 
 
   //tim.Start();

@@ -222,6 +222,10 @@ P2PSync<Dtype>::P2PSync(shared_ptr<Solver<Dtype> > root_solver,
   }
   this->configure(solver_.get());
   solver_->add_callback(this);
+  init_dwbp_queue(solver_->net()->learnable_params().size());
+  
+  // LOG(INFO) << net_->learnable_params().size();
+  // LOG(FATAL) << "------------";
 
   if (parent) {
     // Enable p2p access between devices
@@ -387,6 +391,12 @@ void P2PSync<Dtype>::on_gradients_ready(int size, int offset, int param_id) {
     caffe_gpu_scal(size, Dtype(1.0 / Caffe::solver_count()), diff_ + offset);
   }
 #endif
+}
+
+template<typename Dtype>
+void P2PSync<Dtype>::init_dwbp_queue(int learnable_params_num) {
+  for (int i = 0; i < learnable_params_num; ++i)
+    dwbp_queue_.push_back(new BlockingQueue<P2PSync<Dtype>*>());
 }
 
 template<typename Dtype>
