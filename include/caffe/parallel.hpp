@@ -13,6 +13,7 @@
 #include "caffe/solver.hpp"
 #include "caffe/syncedmem.hpp"
 #include "caffe/util/blocking_queue.hpp"
+#include "caffe/tsqueue.hpp"
 
 namespace caffe {
 
