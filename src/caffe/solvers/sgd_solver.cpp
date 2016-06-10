@@ -146,7 +146,7 @@ void SGDSolver<Dtype>::ApplyUpdateParams(const vector<int> learnable_params_id) 
     Regularize(param_id);
     ComputeUpdateValue(param_id, rate);
     //Update(param_id);
-    this->net_->learnable_params()[param_id]->Update();
+    // this->net_->learnable_params()[param_id]->Update();
   }
 }
 

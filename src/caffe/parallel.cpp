@@ -388,7 +388,7 @@ void P2PSync<Dtype>::on_gradients_ready(int size, int offset, int param_id) {
   } else {
     // Loss functions divide gradients by the batch size, so to compensate
     // for split batch, the root solver divides by number of solvers.
-    caffe_gpu_scal(size, Dtype(1.0 / Caffe::solver_count()), diff_ + offset);
+    // caffe_gpu_scal(size, Dtype(1.0 / Caffe::solver_count()), diff_ + offset);
   }
 #endif
 }
@@ -397,6 +397,20 @@ template<typename Dtype>
 void P2PSync<Dtype>::init_dwbp_queue(int learnable_params_num) {
   for (int i = 0; i < learnable_params_num; ++i)
     dwbp_queue_.push_back(new BlockingQueue<P2PSync<Dtype>*>());
+}
+
+template<typename Dtype>
+Dtype* P2PSync<Dtype>::get_diff() {
+  LOG(INFO) << "--------------------";
+  return diff_; 
+  LOG(INFO) << "--------------------";
+}
+
+template<typename Dtype>
+Dtype* P2PSync<Dtype>::get_data() {
+  LOG(INFO) << "--------------------";
+  return data_; 
+  LOG(INFO) << "--------------------";
 }
 
 template<typename Dtype>

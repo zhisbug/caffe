@@ -1,5 +1,5 @@
 #include <cstdio>
-#include <cuda_runtime.h>
+
 #include <string>
 #include <vector>
 #include <thread>
@@ -57,13 +57,23 @@ void Solver<Dtype>::Init(const SolverParameter& param) {
   }
   // Scaffolding code
   InitTrainNet();
-
   if (Caffe::root_solver()) {
     InitTestNets();
     LOG(INFO) << "Solver scaffolding done.";
   }
   iter_ = 0;
   current_step_ = 0;
+
+  int count = 0;
+  auto learnable_params = net_->learnable_params();
+  for (int i = 0; i < learnable_params.size(); ++i) {
+    count += learnable_params[i] ->count();   
+  }
+  vector<int> shape {count};
+  ps_buffer_.reset(new Blob<Dtype>(shape));
+  LOG(INFO) << "Init PSBUFFER -------------";
+  LOG(INFO) << count;
+
 }
 
 template <typename Dtype>
@@ -286,61 +296,74 @@ template <typename Dtype>
 Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
   Timer tim = Timer();
   Dtype loss;
+  tim.Start();
   net_->Forward(&loss);
 
   auto layers = net_->layers();
   vector<std::thread> threads;
   //auto& learnable_params = net_->learnable_params();
-  tim.Start();
   for (int i = layers.size() - 1; i >= 0; --i) {
-    // LOG(INFO) << "@@@ Layer " << layers[i]->type();
+    LOG(INFO) << "@@@ Layer " << layers[i]->type();
 
     net_->BackwardFromTo(i, i); // Backward layer i
     vector<int> learnable_params_id = layers[i]->learnable_params_id();
     if (learnable_params_id.empty())
       continue;
 
-    // A separate thread to sync grads/params
-    threads.push_back(std::thread(&Solver<Dtype>::AsyncGradGPUs, this, learnable_params_id));
+    // Do computation at main stream: diff = diff * lr
+    // It appears that streams switch on GPU has large overhead
+    ApplyUpdateParams(learnable_params_id);
+
+    // A separate thread to sync grads/params IO
+    for (int i : learnable_params_id) {
+      threads.push_back(std::thread(&Solver<Dtype>::AsyncGradGPUs, this, i));
+      threads[0].join();
+    }
+
   }
-  tim.Stop();
+  // tim.Stop();
 
   // if (Caffe::root_solver()) 
   //   LOG(INFO) << "DWBP compute: " << tim.Seconds();
 
-
   //tim.Start();
   for (int i = 0; i < threads.size(); ++i)
     threads[i].join();
-  //tim.Stop();
-  //if (Caffe::root_solver()) 
-  //  LOG(INFO) << "DWBP: " << tim.Seconds();
+  tim.Stop();
+  if (Caffe::root_solver()) 
+    LOG(INFO) << "DWBP: " << tim.Seconds();
   return loss;
 }
 
 // DWBP: collect gradients for the finished layer, and sync new paramters for all GPUs
 template <typename Dtype>
-void Solver<Dtype>::AsyncGradGPUs(const vector<int> learnable_params_id) {
+void Solver<Dtype>::AsyncGradGPUs(int learnable_params_id) {
   CUDA_CHECK(cudaSetDevice(this->param_.device_id()));
-  int size = 0, offset = 0;
-  for (int i = 0; i < learnable_params_id.size(); ++i) {
-    size += net_->learnable_params()[learnable_params_id[i]]->count();
-  }
-  for (int i = 0; i < learnable_params_id[0]; ++i) {
+  int size = net_->learnable_params()[learnable_params_id]->count();
+  int offset = 0;
+  for (int i = 0; i < learnable_params_id; ++i) {
     offset += net_->learnable_params()[i] ->count();   
   }
-
+  
   CHECK(size > 0) << "Trying to sync with size = 0";
-  // The root solver collects gradients
-  for (int i = 0; i < callbacks_.size(); ++i)
-    callbacks_[i]->on_gradients_ready(size, offset, learnable_params_id[0]);
 
-  // Regularize the graidents at the root solver, and apply the updates 
-  ApplyUpdateParams(learnable_params_id);
+  LOG(INFO) << learnable_params_id << " " << size << " " << offset;
+  Dtype* dst = ps_buffer_->mutable_cpu_diff() + offset;
+  LOG(INFO) << "--------------------";
+  Dtype* src = net_->learnable_params()[learnable_params_id]->mutable_gpu_diff();
+  LOG(INFO) << "--------------------";
+  LOG(INFO) << "dst " << *dst;
+  // LOG(INFO) << "src " << *src;
+  cudaMemcpy(dst, src, size*sizeof(Dtype), cudaMemcpyDeviceToHost);
+  // CHECK(cudaMemcpy(dst, src, size*sizeof(Dtype), cudaMemcpyHostToHost)) << "---------";
 
-  // Copy updated parameters to worker solvers 
-  for (int i = 0; i < callbacks_.size(); ++i)
-    callbacks_[i]->on_start(size, offset, learnable_params_id[0]);
+  // // The root solver collects gradients
+  // for (int i = 0; i < callbacks_.size(); ++i)
+  //   callbacks_[i]->on_gradients_ready(size, offset, learnable_params_id[0]);
+
+  // // Copy updated parameters to worker solvers 
+  // for (int i = 0; i < callbacks_.size(); ++i)
+  //   callbacks_[i]->on_start(size, offset, learnable_params_id[0]);
 }
 
 template <typename Dtype>

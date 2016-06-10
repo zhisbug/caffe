@@ -80,6 +80,8 @@ class Solver {
     virtual void on_start(int size = 0, int offset = 0, int param_id = -1) = 0;
     virtual void on_gradients_ready(int size = 0, int offset = 0, int param_id = -1) = 0;
     virtual void init_dwbp_queue(int learnable_params_num) = 0;
+    virtual Dtype* get_diff() = 0;
+    virtual Dtype* get_data() = 0;
 
     template <typename T>
     friend class Solver;
@@ -97,7 +99,7 @@ class Solver {
 
   //dwbp
   Dtype ForwardBackwardWithDWBP();
-  void AsyncGradGPUs(const vector<int> learnable_params_id);
+  void AsyncGradGPUs(int learnable_params_id);
 
  protected:
   // Make and apply the update value for the current iteration.
@@ -134,6 +136,8 @@ class Solver {
 
   // True iff a request to stop early was received.
   bool requested_early_exit_;
+
+  shared_ptr<Blob<Dtype> > ps_buffer_;
 
   DISABLE_COPY_AND_ASSIGN(Solver);
 };

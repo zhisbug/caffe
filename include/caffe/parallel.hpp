@@ -101,6 +101,8 @@ class P2PSync : public GPUParams<Dtype>, public Solver<Dtype>::Callback,
  protected:
   void on_start(int size = 0, int offset = 0, int param_id = -1);
   void on_gradients_ready(int size = 0, int offset= 0, int param_id = -1);
+  virtual Dtype* get_diff();
+  virtual Dtype* get_data();
 
   void init_dwbp_queue(int learnable_params_num); 
 //   {
