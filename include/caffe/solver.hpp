@@ -7,6 +7,8 @@
 #include "caffe/net.hpp"
 #include "caffe/solver_factory.hpp"
 
+#include "caffe/ps/ps_client.hpp"
+
 namespace caffe {
 
 /**
@@ -99,7 +101,7 @@ class Solver {
 
   //dwbp
   Dtype ForwardBackwardWithDWBP();
-  void AsyncGradGPUs(int learnable_params_id);
+  void AsyncGradGPUs(int learnable_params_idi, bool is_params);
 
  protected:
   // Make and apply the update value for the current iteration.
@@ -137,7 +139,10 @@ class Solver {
   // True iff a request to stop early was received.
   bool requested_early_exit_;
 
-  shared_ptr<Blob<Dtype> > ps_buffer_;
+  vector<std::shared_ptr<Blob<Dtype> > > ps_buffer_; // one-to-one with learnable_params
+  vector<std::shared_ptr<ps::Send<Dtype> > > send_;
+  std::shared_ptr<ps::IRecvAll<Dtype> > irecvall_;
+  std::shared_ptr<ps::Wait<Dtype> > wait_;
 
   DISABLE_COPY_AND_ASSIGN(Solver);
 };

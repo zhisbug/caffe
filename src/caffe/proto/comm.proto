@@ -1,0 +1,25 @@
+package Comm;
+
+message CtrlHeader{
+    enum RoleType{SERVER = 1; WORKER = 2;}
+    required RoleType role = 1;
+    enum Operation{ADD = 1; TERMINATE = 2; QUERY_SERVER = 3; QUERY_WORKERS = 4;}
+    required Operation op = 2;
+    repeated string addr = 3;
+    optional int32 key = 4;
+    optional string id = 5;
+}
+
+message DataHeader{
+    required int32 key = 1 [default = 0];
+    enum DataType {FLOAT  = 1; DOUBLE = 2; INT32  = 3; BYTE   = 4;}
+    required DataType type = 2 [default = FLOAT];
+    required int32 length = 3 [default = 0];
+    required int32 iter = 4 [default = 0];
+    optional bool is_init = 5 [default = false];
+}
+
+message Header{
+    optional CtrlHeader ch = 1;
+    optional DataHeader dh = 2;
+}

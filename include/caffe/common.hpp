@@ -163,7 +163,26 @@ class Caffe {
   inline static void set_solver_count(int val) { Get().solver_count_ = val; }
   inline static bool root_solver() { return Get().root_solver_; }
   inline static void set_root_solver(bool val) { Get().root_solver_ = val; }
+
+  // -------- PS
+  inline static string net_outputs() { return Get().net_outputs_; }
+  inline static void set_net_outputs(string s) { Get().net_outputs_ = s; }
+
+  inline static bool svb() { return Get().svb_; }
+  inline static void set_svb(int val) { Get().svb_ = val; }
+
+  inline static void set_client_id(int val) { Get().client_id_ = val; }
+  inline static int client_id() {return Get().client_id_; }
+
+  inline static bool dwbp() { return Get().dwbp_; }
+  inline static void set_dwbp(bool val) { Get().dwbp_ = val; }
   
+  inline static string recv_addr() { return Get().recv_addr_; }
+  inline static void set_recv_addr(string s) { Get().recv_addr_ = s; }
+
+  inline static string master_addr() { return Get().master_addr_; }
+  inline static void set_master_addr(string s) { Get().master_addr_ = s; }
+
  protected:
 #ifndef CPU_ONLY
   cublasHandle_t cublas_handle_;
@@ -174,6 +193,15 @@ class Caffe {
   Brew mode_;
   int solver_count_;
   bool root_solver_;
+
+  // -------- PS
+  string net_outputs_;
+  bool svb_;
+  int client_id_;
+  bool dwbp_;
+  string recv_addr_;
+  string master_addr_;
+
 
  private:
   // The private constructor to avoid duplicate instantiation.

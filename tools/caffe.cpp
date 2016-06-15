@@ -47,8 +47,17 @@ DEFINE_string(sigint_effect, "stop",
 DEFINE_string(sighup_effect, "snapshot",
              "Optional; action to take when a SIGHUP signal is received: "
              "snapshot, stop or none.");
-DEFINE_bool(dwbp, false, "Enable DWBP or not?");
 
+// -------- PS
+
+DEFINE_int32(client_id, 0, "client_id");
+DEFINE_string(net_outputs, "", "The logging for petuum");
+DEFINE_bool(svb, false, "svb");
+DEFINE_bool(dwbp, false, "Enable DWBP or not?");
+DEFINE_string(recv_addr, "tcp://127.0.0.1:5554",
+             "ps master address");
+DEFINE_string(master_addr, "tcp://127.0.0.1:5555",
+             "ps master address");
 
 // A simple registry for caffe commands.
 typedef int (*BrewFunction)();
@@ -202,6 +211,14 @@ int train() {
         GetRequestedAction(FLAGS_sigint_effect),
         GetRequestedAction(FLAGS_sighup_effect));
   
+  // -------- PS
+  Caffe::set_client_id(FLAGS_client_id);
+  Caffe::set_net_outputs(FLAGS_net_outputs); 
+  Caffe::set_svb(FLAGS_svb);
+  Caffe::set_dwbp(FLAGS_dwbp);
+  Caffe::set_recv_addr(FLAGS_recv_addr);
+  Caffe::set_master_addr(FLAGS_master_addr);
+
   shared_ptr<caffe::Solver<float> >
       solver(caffe::SolverRegistry<float>::CreateSolver(solver_param));
 
