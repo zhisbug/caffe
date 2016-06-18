@@ -80,19 +80,22 @@ public:
 class ZMQClient{
 public:
     ZMQClient(const std::string &dst) : dst_(dst){ 
-        std::unordered_map<std::string, std::shared_ptr<zmq::socket_t>> 
-            &socket_pool_ = GetSockPool();;
-        if (socket_pool_.find(dst) == socket_pool_.end()){
-            //socket_.reset(new zmq::socket_t(*get_context(), ZMQ_DEALER)); 
-            srand(time(NULL));
-            std::string id = std::to_string(rand()%10000) + std::to_string(time(NULL));;
-            socket_.reset(new zmq::socket_t(ZMQContext::Get(), ZMQ_DEALER)); 
-            socket_->setsockopt(ZMQ_IDENTITY, id.c_str(), id.length());
-            socket_->connect(dst);
-            socket_pool_[dst] = socket_;
-        }else{
-            socket_ = socket_pool_[dst];
-        }
+        socket_.reset(new zmq::socket_t(ZMQContext::Get(), ZMQ_DEALER)); 
+        socket_->connect(dst);
+
+        // std::unordered_map<std::string, std::shared_ptr<zmq::socket_t>> 
+        //     &socket_pool_ = GetSockPool();;
+        // if (socket_pool_.find(dst) == socket_pool_.end()){
+        //     //socket_.reset(new zmq::socket_t(*get_context(), ZMQ_DEALER)); 
+        //     srand(time(NULL));
+        //     std::string id = std::to_string(rand()%10000) + std::to_string(time(NULL));;
+        //     socket_.reset(new zmq::socket_t(ZMQContext::Get(), ZMQ_DEALER)); 
+        //     socket_->setsockopt(ZMQ_IDENTITY, id.c_str(), id.length());
+        //     socket_->connect(dst);
+        //     socket_pool_[dst] = socket_;
+        // }else{
+        //     socket_ = socket_pool_[dst];
+        // }
     }
     ~ZMQClient(){
         std::unordered_map<std::string, std::shared_ptr<zmq::socket_t>> 

@@ -353,7 +353,6 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
       threads.push_back(std::thread(&Solver<Dtype>::AsyncGradGPUs, this, i, false));
       // std::thread t(&Solver<Dtype>::AsyncGradGPUs, this, i, false);
       // t.join();
-      // threads[0].join();
     }
 
   }
@@ -371,8 +370,10 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
 
   static int mycount = 0;
   mycount++;
-  if (mycount > 10)
+  if (mycount > 10) {
+    send_[0]->Terminate();
     LOG(FATAL) << "-----------------------";
+  }
 
   return loss;
 }
@@ -404,14 +405,10 @@ void Solver<Dtype>::AsyncGradGPUs(int id, bool is_init) {
   if (is_init) {
     gpu_diff = net_->learnable_params()[id]->mutable_gpu_data();
     cudaMemcpy(ps_bf_diff, gpu_diff, size*sizeof(Dtype), cudaMemcpyDeviceToHost);
-    LOG(INFO) << "Send Init " << key << " " << size << ": " << ps_bf_diff[0] 
-      << " " << ps_bf_diff[1] << " " << ps_bf_diff[size-1];
     send_[key]->InitRun(ps_bf_diff, size*sizeof(Dtype));
   } else {
     gpu_diff = net_->learnable_params()[id]->mutable_gpu_diff();
     cudaMemcpy(ps_bf_diff, gpu_diff, size*sizeof(Dtype), cudaMemcpyDeviceToHost);
-    LOG(INFO) << "Send " << key << " " << size << ": " << ps_bf_diff[0] 
-      << " " << ps_bf_diff[1] << " " << ps_bf_diff[size-1];
     // since it is add in ps, we need diff = -diff
     caffe_axpy<Dtype>(size, Dtype(-1), ps_bf_diff, ps_bf_diff);
     send_[key]->Run(ps_bf_diff, size*sizeof(Dtype));
@@ -420,16 +417,24 @@ void Solver<Dtype>::AsyncGradGPUs(int id, bool is_init) {
   // param: PS -> CPU -> GPU
   Dtype* ps_bf_data = ps_buffer_[id]->mutable_cpu_data();
 
-  // CHECK: ps_bf_data = ps_bf_data + ps_bf_diff 
-  std::shared_ptr<Blob<Dtype> > ps_bf_true(new Blob<Dtype>(ps_buffer_[id]->shape()));
-  caffe_add<Dtype>(size, ps_bf_data, ps_bf_diff, ps_bf_true->mutable_cpu_data());
+  bool check = false;
+  if (check) {
+    // CHECK: ps_bf_data = ps_bf_data + ps_bf_diff 
+    std::shared_ptr<Blob<Dtype> > ps_bf_true(new Blob<Dtype>(ps_buffer_[id]->shape()));
+    caffe_add<Dtype>(size, ps_bf_data, ps_bf_diff, ps_bf_true->mutable_cpu_data());
 
-  wait_->Run(ps_bf_data, size*sizeof(Dtype), key);
-  // LOG(INFO) << "Wait " << key << ": " << ps_bf_data[0] 
-  //   << " " << ps_bf_data[1] << " " << ps_bf_data[size-1];
+    wait_->Run(ps_bf_data, size*sizeof(Dtype), key);
+    // LOG(INFO) << "Wait " << key << ": " << ps_bf_data[0] 
+    //   << " " << ps_bf_data[1] << " " << ps_bf_data[size-1];
 
-  LOG(INFO) << "Wait " << key << " with diff: " 
-    << mydiff(size, ps_bf_data, ps_bf_true->mutable_cpu_data());
+    Dtype diff = mydiff(size, ps_bf_data, ps_bf_true->mutable_cpu_data());
+    Dtype eps = 0.00001;
+    CHECK(diff < eps && diff > -eps); 
+    // LOG(INFO) << "Wait " << key << " with diff: " 
+    //   << mydiff(size, ps_bf_data, ps_bf_true->mutable_cpu_data());
+  } else {
+    wait_->Run(ps_bf_data, size*sizeof(Dtype), key);
+  }
 
   Dtype* gpu_data = net_->learnable_params()[id]->mutable_gpu_data();
   cudaMemcpy(gpu_data, ps_bf_data, size*sizeof(Dtype), cudaMemcpyHostToDevice);
