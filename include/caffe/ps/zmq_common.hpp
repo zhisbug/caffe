@@ -12,7 +12,7 @@
 
 #include <glog/logging.h>
 
-#include "zmq.hpp"
+#include <zmq.hpp>
 #include "caffe/common.hpp"
 #include "caffe/proto/comm.pb.h"
 
@@ -31,6 +31,7 @@ public:
         cond_.wait(lk, [this, key]{return table_.find(key)!=table_.end();});
         std::shared_ptr<T> ret = table_[key];
         table_.erase(key);
+        cond_.notify_one();
         return ret;
     }
     static ThreadSafeHashTable<T> *get_table(){
@@ -57,6 +58,7 @@ public:
         cond_.wait(lk, [this]{return !q_.empty();});
         T ret = q_.front();
         q_.pop();
+        cond_.notify_one();
         return ret;
     }
 private:
