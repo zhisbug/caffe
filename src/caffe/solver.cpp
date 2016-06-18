@@ -95,6 +95,7 @@ void Solver<Dtype>::Init(const SolverParameter& param) {
       AsyncGradGPUs(i, true);
     }
   } else {
+    // BUG
     LOG(INFO) << "Download inited params from ps --------";
     for (int i = 0; i < learnable_params.size(); ++i) {
       int key = i;
