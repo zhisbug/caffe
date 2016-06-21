@@ -27,6 +27,7 @@ public:
         LOG(INFO) << "Master connected...";
 
         LOG(INFO) << "Launching producer and consumer...";
+
         producer_ = std::shared_ptr<std::thread>(new std::thread([this]
             {
                 while(1){
@@ -53,71 +54,85 @@ public:
                     }
                 }
             }));
+        
         consumer_ = std::shared_ptr<std::thread>(new std::thread([this]
             {
                 while(1){
-                    //LOG(INFO) << "Consumer Waiting";
                     MD_PAIR one_pair = queue_.wait_and_pop();
                     std::shared_ptr<Comm::Header> header = one_pair.first;
-                    if (header->has_ch()){
-                        CHECK(header->ch().role() == Comm::CtrlHeader::SERVER);
-                        if (header->ch().op() == Comm::CtrlHeader::ADD){
-                            CHECK(header->ch().addr_size() == 1);
-                            CHECK(header->ch().has_id());
-                            server_->Send(header->ch().id(), *header);
-                            //const std::string cid = std::to_string(to_workers_.size());
-                            if (to_workers_.find(header->ch().addr(0)) == to_workers_.end()){
-                                to_workers_[header->ch().addr(0)] = 
-                                    std::shared_ptr<ZMQClient>(new ZMQClient(header->ch().addr(0))); 
-                            }
-                            LOG(INFO) << "Issue a CtrlHeader\t"
-                                           << "(adding worker\"" << header->ch().addr(0)
-                                           << "\")";
+
+                    if(header->has_ch()){
+                        std::string id = header->ch().id();
+                        if(header->ch().op() == Comm::CtrlHeader::ADD){
+                            CHECK(header->ch().role() == Comm::CtrlHeader::WORKER);
+                            int k = header->ch().key();
+                            LOG(INFO) << "Registering " << id << " with key[" << k << "]";
+                            to_workers_[k].push_back(id);
+                            if(is_init_.find(k) == is_init_.end())
+                                is_init_[k] = false;
                             continue;
-                        }else if (header->ch().op() == Comm::CtrlHeader::TERMINATE){
+                        }else if(header->ch().op() == Comm::CtrlHeader::TERMINATE){
                             LOG(INFO) << "Consumer Terminating...";
                             break; 
+                        }else{
+                            LOG(FATAL) << "Not recognized.";
                         }
                     }
+
                     CHECK(header->has_dh());
-                    LOG(INFO) << "Issue a DataHeader with Key[" 
-                                   << header->dh().key() << "]";
+                    int k = header->dh().key();
                     std::shared_ptr<char> buf = one_pair.second;
-                    switch (header->dh().type()){
-                    case (Comm::DataHeader::FLOAT):
-                        accumulate<float>(header->dh().key(), 
-                            reinterpret_cast<float*>(buf.get()), header->dh().length());
-                        break;
-                    case (Comm::DataHeader::DOUBLE):
-                        accumulate<double>(header->dh().key(), 
-                            reinterpret_cast<double*>(buf.get()), header->dh().length());
-                        break;
-                    case (Comm::DataHeader::INT32):
-                        accumulate<int>(header->dh().key(), 
-                            reinterpret_cast<int*>(buf.get()), header->dh().length());
-                        break;
-                    }
-                    // if (kv_count_.find(header->dh().key()) == kv_count_.end()) 
-                    //     kv_count_[header->dh().key()] = 0;
-		    CHECK(!to_workers_.empty());
-                    if (!header->dh().is_init()){
-		        ++kv_count_[header->dh().key()];
-		    }
-                    if (header->dh().is_init() ||
-			kv_count_[header->dh().key()] % to_workers_.size() == 0){
-                        LOG(INFO) << "Sending KEY[" << header->dh().key() << "]";
-                        for (auto &i : to_workers_){
-                            i.second->Send(*header, kv_pair_[header->dh().key()].get()); 
+                    
+                    accumulate_wrapper(header.get(), buf.get());
+
+                    if(header->dh().is_init()){
+                        CHECK(is_init_[k] == false);
+                        is_init_[k] = true;
+                        kv_iter_[k] = header->dh().iter();
+
+                        for(auto& id : to_workers_[k]){
+                            server_->Send(id, *header, kv_pair_[k].get());
+                            num_workers_[k]++;
                         }
-                    }                
-		}
+                    }else{
+                        CHECK(header->dh().iter() == kv_iter_[k]);
+                        kv_count_[k]++;
+                        if(kv_count_[k] == num_workers_[k]){
+                            kv_count_[k] = 0;
+                            num_workers_[k] = to_workers_[k].size();
+                            kv_iter_[k]++;
+                            auto dh = header->mutable_dh();
+                            dh->set_iter(kv_iter_[k]);
+                            for(auto& id : to_workers_[k])
+                                server_->Send(id, *header, kv_pair_[k].get());
+                        }
+                    }
+                }
             }));
     }
+
     void Run(){
-        producer_->join(); 
+        producer_->join();
         consumer_->join();
     }
+
 private:
+    void accumulate_wrapper(Comm::Header* header, void* buf){
+        switch (header->dh().type()){
+        case (Comm::DataHeader::FLOAT):
+            accumulate<float>(header->dh().key(), 
+                reinterpret_cast<float*>(buf), header->dh().length());
+            break;
+        case (Comm::DataHeader::DOUBLE):
+            accumulate<double>(header->dh().key(), 
+                reinterpret_cast<double*>(buf), header->dh().length());
+            break;
+        case (Comm::DataHeader::INT32):
+            accumulate<int>(header->dh().key(), 
+                reinterpret_cast<int*>(buf), header->dh().length());
+            break;
+        }
+    }
     template <typename T>
     void accumulate(int key, T *delta, int length){
         if (kv_pair_.find(key) == kv_pair_.end()){
@@ -126,19 +141,27 @@ private:
             memset(kv_pair_[key].get(), 0, length);
         }
         T *para = reinterpret_cast<T*>(kv_pair_[key].get());
-        for (int i = 0; i < length/sizeof(T); i++)
+        for (int i = 0; i < length/sizeof(T); i++){
             para[i] += delta[i];
+        }
     }
+
 private:
+    std::string my_addr_, master_addr_;
     std::shared_ptr<ZMQServer> server_;
     std::shared_ptr<ZMQClient> to_master_;
-    std::unordered_map<std::string, std::shared_ptr<ZMQClient>> to_workers_;
-    ThreadSafeQueue<MD_PAIR> queue_;
-    std::unordered_map<int, std::shared_ptr<char>> kv_pair_;
+
+    std::unordered_map<int, std::vector<std::string> > to_workers_;
+    std::unordered_map<int, int> num_workers_; // number of ACTIVE workers
+
+    std::unordered_map<int, bool> is_init_;
+    std::unordered_map<int, std::shared_ptr<char> > kv_pair_;
     std::unordered_map<int, int> kv_count_;
+    std::unordered_map<int, int> kv_iter_;
+
+    ThreadSafeQueue<MD_PAIR> queue_;
     std::shared_ptr<std::thread> producer_;
     std::shared_ptr<std::thread> consumer_;
-    std::string my_addr_, master_addr_;
 };
 
 }

@@ -33,6 +33,44 @@ namespace caffe {
  */
 typedef boost::function<SolverAction::Enum()> ActionCallback;
 
+template <typename Dtype>
+class MySyncer {
+public:
+    MySyncer(Blob<Dtype>* ps_buffer, Blob<Dtype>* gpu_param) :
+      ps_buffer_(ps_buffer), gpu_param_(gpu_param) {
+        CHECK(ps_buffer_->count() == gpu_param_->count());
+        size_ = ps_buffer_->count()*sizeof(Dtype);
+    }
+    void gpu2ps_data(){
+        cudaMemcpy(ps_buffer_->mutable_cpu_data(),
+                   gpu_param_->mutable_gpu_data(), 
+                   size_, cudaMemcpyDeviceToHost);
+    }
+    void ps2gpu_data(){
+        cudaMemcpy(gpu_param_->mutable_gpu_data(),
+                   ps_buffer_->mutable_gpu_data(), 
+                   size_, cudaMemcpyHostToDevice);
+    }
+    void gpu2ps_diff(){
+        cudaMemcpy(gpu_param_->mutable_gpu_diff(),
+                   ps_buffer_->mutable_cpu_diff(), 
+                   size_, cudaMemcpyDeviceToHost);
+    }
+    void ps2gpu_diff(){
+        cudaMemcpy(ps_buffer_->mutable_cpu_diff(),
+                   gpu_param_->mutable_gpu_diff(), 
+                   size_, cudaMemcpyHostToDevice);
+    }
+    Dtype* ps_cpu_diff(){
+        return ps_buffer_->mutable_cpu_diff();
+    }
+private:
+    Blob<Dtype>* ps_buffer_;
+    Blob<Dtype>* gpu_param_;
+    size_t size_;
+};
+
+
 /**
  * @brief An interface for classes that perform optimization on Net%s.
  *
@@ -139,13 +177,14 @@ class Solver {
   // True iff a request to stop early was received.
   bool requested_early_exit_;
 
+  // PS -------------------
   vector<std::shared_ptr<Blob<Dtype> > > ps_buffer_; // one-to-one with learnable_params
-  vector<std::shared_ptr<ps::Send<Dtype> > > send_;
-  std::shared_ptr<ps::IRecvAll<Dtype> > irecvall_;
-  std::shared_ptr<ps::Wait<Dtype> > wait_;
+  vector<std::shared_ptr<ps::Worker<Dtype> > > worker_;
+  vector<std::shared_ptr<MySyncer<Dtype> > > syncer_;
 
   DISABLE_COPY_AND_ASSIGN(Solver);
 };
+
 
 /**
  * @brief Solver that only computes gradients, used as worker
