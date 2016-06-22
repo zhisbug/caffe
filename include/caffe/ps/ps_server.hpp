@@ -3,6 +3,7 @@
 
 #include <thread>
 #include "zmq_common.hpp"
+#include "caffe/util/benchmark.hpp"
 
 namespace ps{
 
@@ -36,7 +37,7 @@ public:
                     void *buf = NULL;
                     //LOG(INFO) << "Procuder Receiving";
                     server_->Recv(&id, header, &buf);
-                    LOG(INFO) << "Receive a DataHeader? " << header->has_dh();
+                    //LOG(INFO) << "Receive a DataHeader? " << header->has_dh();
                     if (header->has_ch()){
                         header->mutable_ch()->set_id(id);
                     }
@@ -83,7 +84,12 @@ public:
                     int k = header->dh().key();
                     std::shared_ptr<char> buf = one_pair.second;
                     
+                    caffe::Timer tim = caffe::Timer();
+                    tim.Start();
                     accumulate_wrapper(header.get(), buf.get());
+                    tim.Stop();
+                    LOG(INFO) << "accumulate " << k << " "  << tim.Seconds();
+
 
                     if(header->dh().is_init()){
                         CHECK(is_init_[k] == false);

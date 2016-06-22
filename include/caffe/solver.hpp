@@ -47,7 +47,7 @@ public:
                    size_, cudaMemcpyDeviceToHost);
     }
     void ps2gpu_data(){
-        cudaMemcpy(gpu_param_->mutable_gpu_data(),
+        cudaMemcpy(gpu_param_->mutable_cpu_data(),
                    ps_buffer_->mutable_gpu_data(), 
                    size_, cudaMemcpyHostToDevice);
     }

@@ -375,16 +375,28 @@ void Solver<Dtype>::AsyncGradGPUs(int id, bool is_init) {
   int size = ps_buffer_[id]->count();
   CHECK(size > 0) << "Trying to sync with size = 0";
 
+  Timer tim = Timer();
+  tim.Start();
+
   // diff: GPU -> CPU
   syncer_[id]->gpu2ps_diff();
   // since it is add in ps, we need diff = -diff
   Dtype* ps_bf_diff = ps_buffer_[id]->mutable_cpu_diff();
   caffe_axpy<Dtype>(size, Dtype(-1), ps_bf_diff, ps_bf_diff);
+
+  tim.Stop();
+  if (id == 10)
+      LOG(INFO) << "@@@ GPU -> CPU: " << tim.Seconds();
   
+  tim.Start();
   // Sync with PS
   worker_[id]->Push();
   worker_[id]->IncIter();
+  tim.Stop();
+  if (id == 10)
+      LOG(INFO) << "@@@ Sync with PS: " << tim.Seconds();
 
+  tim.Start();
   // CHECK: ps_bf_data = ps_bf_data + ps_bf_diff 
   bool check = false;
   if (check) {
@@ -405,9 +417,16 @@ void Solver<Dtype>::AsyncGradGPUs(int id, bool is_init) {
     worker_[id]->Pull();
   }
 
+  tim.Stop();
+  if (id == 10)
+      LOG(INFO) << "@@@ Sync with PS: " << tim.Seconds();
+
+  tim.Start();
   // CPU -> GPU
   syncer_[id]->ps2gpu_data();
-
+  tim.Stop();
+  if (id == 10)
+      LOG(INFO) << "@@@ CPU -> GPU: " << tim.Seconds();
 
   // // The root solver collects gradients
   // for (int i = 0; i < callbacks_.size(); ++i)
