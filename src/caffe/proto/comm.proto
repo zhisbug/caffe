@@ -16,10 +16,14 @@ message DataHeader{
     required DataType type = 2 [default = FLOAT];
     required int32 length = 3 [default = 0];
     required int32 iter = 4 [default = 0];
+    
     optional bool is_init = 5 [default = false];
+    repeated int32 svb_length = 6;
+    optional int32 num_worker = 7 [default = 0];
 }
 
 message Header{
     optional CtrlHeader ch = 1;
     optional DataHeader dh = 2;
 }
+

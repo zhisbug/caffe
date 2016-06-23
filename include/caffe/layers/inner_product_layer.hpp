@@ -29,6 +29,12 @@ class InnerProductLayer : public Layer<Dtype> {
   virtual inline int ExactNumBottomBlobs() const { return 1; }
   virtual inline int ExactNumTopBlobs() const { return 1; }
 
+  // PS --------
+  inline int M() const { return M_; }
+  inline int K() const { return K_; }
+  inline int N() const { return N_; }
+  inline bool transpose() const { return transpose_; }
+
  protected:
   virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);

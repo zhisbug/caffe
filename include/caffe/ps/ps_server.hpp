@@ -84,33 +84,42 @@ public:
                     int k = header->dh().key();
                     std::shared_ptr<char> buf = one_pair.second;
                     
-                    caffe::Timer tim = caffe::Timer();
-                    tim.Start();
-                    accumulate_wrapper(header.get(), buf.get());
-                    tim.Stop();
-                    LOG(INFO) << "accumulate " << k << " "  << tim.Seconds();
-
-
                     if(header->dh().is_init()){
                         CHECK(is_init_[k] == false);
                         is_init_[k] = true;
                         kv_iter_[k] = header->dh().iter();
 
+                        accumulate_wrapper(header.get(), buf.get());
+
+                        num_workers_[k] = to_workers_[k].size();
+                        header->mutable_dh()->set_num_worker(num_workers_[k]);
                         for(auto& id : to_workers_[k]){
                             server_->Send(id, *header, kv_pair_[k].get());
-                            num_workers_[k]++;
                         }
                     }else{
                         CHECK(header->dh().iter() == kv_iter_[k]);
+                        CHECK(num_workers_[k] = to_workers_[k].size());
+                        
                         kv_count_[k]++;
-                        if(kv_count_[k] == num_workers_[k]){
-                            kv_count_[k] = 0;
-                            num_workers_[k] = to_workers_[k].size();
-                            kv_iter_[k]++;
-                            auto dh = header->mutable_dh();
-                            dh->set_iter(kv_iter_[k]);
+
+                        if(header->dh().svb_length_size()){
+                            header->mutable_dh()->set_iter(kv_iter_[k]+1);
                             for(auto& id : to_workers_[k])
-                                server_->Send(id, *header, kv_pair_[k].get());
+                                server_->Send(id, *header, buf.get());
+                            if(kv_count_[k] == num_workers_[k]){
+                                kv_count_[k] = 0;
+                                kv_iter_[k]++;
+                            }
+                        }else{
+                            accumulate_wrapper(header.get(), buf.get());
+
+                            if(kv_count_[k] == num_workers_[k]){
+                                kv_count_[k] = 0;
+                                kv_iter_[k]++;
+                                header->mutable_dh()->set_iter(kv_iter_[k]);
+                                for(auto& id : to_workers_[k])
+                                    server_->Send(id, *header, kv_pair_[k].get());
+                            }
                         }
                     }
                 }

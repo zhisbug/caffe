@@ -66,24 +66,45 @@ void Solver<Dtype>::Init(const SolverParameter& param) {
 
   // -------------- PS --------------
   auto learnable_params = net_->learnable_params();
+  vector<shared_ptr<Layer<Dtype> > > layers = net_->layers();
 
-  for (int i = 0; i < learnable_params.size(); ++i) {
-    ps_buffer_.push_back(std::shared_ptr<Blob<Dtype> >
-      (new Blob<Dtype>(learnable_params[i]->shape())));
-    syncer_.push_back(std::shared_ptr<MySyncer<Dtype> >
-      (new MySyncer<Dtype>(ps_buffer_[i].get(), learnable_params[i])));
+  for (int l = 0; l < layers.size(); ++l) {
+    vector<int> myid = layers[l]->learnable_params_id();
+    for (int idx = 0; idx < myid.size(); ++idx) {
+      int i = myid[idx];
+      ps_buffer_.push_back(std::shared_ptr<Blob<Dtype> >
+        (new Blob<Dtype>(learnable_params[i]->shape())));
+      syncer_.push_back(std::shared_ptr<MySyncer<Dtype> >
+        (new MySyncer<Dtype>(ps_buffer_[i].get(), learnable_params[i])));
 
-    syncer_[i]->gpu2ps_data();
+      syncer_[i]->gpu2ps_data();
 
-    worker_.push_back(std::shared_ptr<ps::Worker<Dtype> >
-      (new ps::Worker<Dtype>(i, ps_buffer_[i]->count()*sizeof(Dtype),
-                             ps_buffer_[i]->mutable_cpu_data(),
-                             ps_buffer_[i]->mutable_cpu_diff(),
-                             Caffe::master_addr())
-       ));
-    worker_[i]->InitWithPS(Caffe::client_id());
+      if (idx == 0 && Caffe::svb() && (string(layers[l]->type()) == "InnerProduct")){
+        LOG(INFO) << "svb at param_id " << i;
+        InnerProductLayer<Dtype>* layer = 
+            dynamic_cast<InnerProductLayer<Dtype>*>(layers[l].get());
+        CHECK(layer);
+        worker_.push_back(std::shared_ptr<ps::SVBWorker<Dtype> >
+          (new ps::SVBWorker<Dtype>(i, ps_buffer_[i]->count()*sizeof(Dtype),
+                                 ps_buffer_[i]->mutable_cpu_data(),
+                                 ps_buffer_[i]->mutable_cpu_diff(),
+                                 Caffe::master_addr(),
+                                 net_->top_vecs()[l][0], net_->bottom_vecs()[l][0],
+                                 layer)
+           ));
+      }else{
+        worker_.push_back(std::shared_ptr<ps::Worker<Dtype> >
+          (new ps::Worker<Dtype>(i, ps_buffer_[i]->count()*sizeof(Dtype),
+                                 ps_buffer_[i]->mutable_cpu_data(),
+                                 ps_buffer_[i]->mutable_cpu_diff(),
+                                 Caffe::master_addr())
+           ));
+      }
+      worker_[i]->InitWithPS(Caffe::client_id());
 
-    syncer_[i]->ps2gpu_data();
+      syncer_[i]->ps2gpu_data();
+    }
+
   }
 }
 
@@ -306,13 +327,20 @@ void Solver<Dtype>::Step(int iters) {
 template <typename Dtype>
 Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
   Timer tim = Timer();
+  Timer tim2 = Timer();
   Dtype loss;
   tim.Start();
+  tim2.Start();
   net_->Forward(&loss);
+  tim2.Stop();
+  LOG(INFO) << "Forward " << tim2.Seconds() << "--------------";
 
   auto layers = net_->layers();
   vector<std::thread> threads;
   //auto& learnable_params = net_->learnable_params();
+
+  float acc = 0;
+  tim2.Start();
   for (int i = layers.size() - 1; i >= 0; --i) {
     // LOG(INFO) << "@@@ Layer " << layers[i]->type();
 
@@ -327,9 +355,13 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
 
     // A separate thread to sync grads/params IO
     for (int i : learnable_params_id) {
-      threads.push_back(std::thread(&Solver<Dtype>::AsyncGradGPUs, this, i, false));
-      // std::thread t(&Solver<Dtype>::AsyncGradGPUs, this, i, false);
-      // t.join();
+      tim2.Stop();
+      acc += tim2.Seconds();
+      tim2.Start();
+      LOG(INFO) << "id " << i << " Start at "  << acc;
+      // threads.push_back(std::thread(&Solver<Dtype>::AsyncGradGPUs, this, i, false));
+      std::thread t(&Solver<Dtype>::AsyncGradGPUs, this, i, false);
+      t.join();
     }
 
   }
@@ -343,11 +375,11 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
     threads[i].join();
   tim.Stop();
   if (Caffe::root_solver()) 
-    LOG(INFO) << "DWBP: " << tim.Seconds();
+    LOG(INFO) << "DWBP: " << tim.Seconds() << "--------------";
 
   static int mycount = 0;
   mycount++;
-  if (mycount > 20) {
+  if (mycount > 2) {
     worker_[0]->Terminate();
     LOG(FATAL) << "-----------------------";
   }
@@ -361,11 +393,18 @@ Dtype mydiff(int N, Dtype* X, Dtype* Y) {
   caffe_copy<Dtype>(N, X, buf.get());             // buf = X
   caffe_axpy<Dtype>(N, Dtype(-1), Y, buf.get());     // buf = -Y + buf
   caffe_abs<Dtype>(N, buf.get(), buf.get());
+
+  LOG(INFO) << "diff X " << X[0] << " " << X[1] << " " << X[2];
+  LOG(INFO) << "diff Y " << Y[0] << " " << Y[1] << " " << Y[2];
+
   Dtype sum = 0;
   for (int i = 0; i < N; ++i)
     sum += buf.get()[i];
+  Dtype norm = 0;
+  for (int i = 0; i < N; ++i)
+    norm += X[i] > 0 ? X[i] : -X[i];
 
-  return sum;
+  return sum/norm;
 }
 
 // DWBP: collect gradients for the finished layer, and sync new paramters for all GPUs
@@ -374,6 +413,9 @@ void Solver<Dtype>::AsyncGradGPUs(int id, bool is_init) {
   CUDA_CHECK(cudaSetDevice(this->param_.device_id()));
   int size = ps_buffer_[id]->count();
   CHECK(size > 0) << "Trying to sync with size = 0";
+
+  Timer tim2 = Timer();
+  tim2.Start();
 
   Timer tim = Timer();
   tim.Start();
@@ -385,48 +427,56 @@ void Solver<Dtype>::AsyncGradGPUs(int id, bool is_init) {
   caffe_axpy<Dtype>(size, Dtype(-1), ps_bf_diff, ps_bf_diff);
 
   tim.Stop();
-  if (id == 10)
-      LOG(INFO) << "@@@ GPU -> CPU: " << tim.Seconds();
+  LOG_IF(INFO, id == 10) << "@@@ GPU -> CPU: " << tim.Seconds();
   
   tim.Start();
   // Sync with PS
   worker_[id]->Push();
   worker_[id]->IncIter();
   tim.Stop();
-  if (id == 10)
-      LOG(INFO) << "@@@ Sync with PS: " << tim.Seconds();
+  LOG_IF(INFO, id == 10) << "@@@ Push PS: " << tim.Seconds();
 
   tim.Start();
   // CHECK: ps_bf_data = ps_bf_data + ps_bf_diff 
-  bool check = false;
+  bool check = true;
   if (check) {
-    Dtype* ps_bf_data = ps_buffer_[id]->mutable_cpu_data();
+    // Dtype* ps_bf_data = ps_buffer_[id]->mutable_cpu_data();
+    // std::shared_ptr<Blob<Dtype> > ps_bf_true(new Blob<Dtype>(ps_buffer_[id]->shape()));
+    // caffe_add<Dtype>(size, ps_bf_data, ps_bf_diff, ps_bf_true->mutable_cpu_data());
+
+    // worker_[id]->Pull();
+
+    // Dtype diff = mydiff(size, ps_bf_data, ps_bf_true->mutable_cpu_data());
+    // Dtype eps = 0.00001;
+    // CHECK(diff < eps && diff > -eps) << " at id " << id
+    //     << " with diff " << diff;
+
     std::shared_ptr<Blob<Dtype> > ps_bf_true(new Blob<Dtype>(ps_buffer_[id]->shape()));
-    caffe_add<Dtype>(size, ps_bf_data, ps_bf_diff, ps_bf_true->mutable_cpu_data());
+    LOG(INFO) << ps_bf_diff[0] << " " << ps_bf_diff[1] << " " << ps_bf_diff[2];
+    // memcpy(ps_bf_true->mutable_cpu_diff(), ps_bf_diff, size);
 
     worker_[id]->Pull();
-    // LOG(INFO) << "Wait " << id << ": " << ps_bf_data[0] 
-    //   << " " << ps_bf_data[1] << " " << ps_bf_data[size-1];
+    LOG(INFO) << ps_bf_diff[0] << " " << ps_bf_diff[1] << " " << ps_bf_diff[2];
 
-    Dtype diff = mydiff(size, ps_bf_data, ps_bf_true->mutable_cpu_data());
+    Dtype diff = mydiff(size, ps_bf_true->mutable_cpu_diff(), ps_bf_diff);
     Dtype eps = 0.00001;
-    CHECK(diff < eps && diff > -eps); 
-    // LOG(INFO) << "Wait " << id << " with diff: " 
-    //   << mydiff(size, ps_bf_data, ps_bf_true->mutable_cpu_data());
+    CHECK(diff < eps && diff > -eps) << " at id " << id
+        << " with diff " << diff;
   } else {
     worker_[id]->Pull();
   }
 
   tim.Stop();
-  if (id == 10)
-      LOG(INFO) << "@@@ Sync with PS: " << tim.Seconds();
+  LOG_IF(INFO, id == 10) << "@@@ Pull: " << tim.Seconds();
 
   tim.Start();
   // CPU -> GPU
   syncer_[id]->ps2gpu_data();
   tim.Stop();
-  if (id == 10)
-      LOG(INFO) << "@@@ CPU -> GPU: " << tim.Seconds();
+  LOG_IF(INFO, id == 10) << "@@@ CPU -> GPU: " << tim.Seconds();
+
+  tim2.Stop();
+  LOG(INFO) << "AsyncGradGPUs " << id << " takes " << tim2.Seconds();
 
   // // The root solver collects gradients
   // for (int i = 0; i < callbacks_.size(); ++i)

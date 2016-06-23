@@ -5,6 +5,11 @@
 #include <thread>
 #include "zmq_common.hpp"
 
+#include "caffe/blob.hpp"
+#include "caffe/layers/inner_product_layer.hpp"
+#include "caffe/util/math_functions.hpp"
+#include "caffe/util/benchmark.hpp"
+
 namespace ps{
 
 using std::string;
@@ -18,7 +23,10 @@ public:
     Worker(int key, int bytes, T* data, T* diff, string master_addr) :
         data_(data), diff_(diff)
     {
-        LOG(INFO) << "key: " << key << "\tbytes: " << bytes;
+        static int id = 0;
+        id_ = id++;
+
+        LOG(INFO) << "id: " << id_ << " key: " << key << "\tbytes: " << bytes;
         Comm::DataHeader *dh = header_.mutable_dh();
         dh->set_key(key);
         dh->set_type(DataHeaderTypeWrapper<T>());
@@ -45,6 +53,8 @@ public:
         client_->Send(header4server);
     }
 
+    virtual ~Worker() {}
+
     void InitWithPS(int client_id){
         inited_ = true;
         client_id_ = client_id;
@@ -60,9 +70,10 @@ public:
         Comm::Header h;
         client_->Recv(&h, (void**)&data_);
         dh->set_iter(h.dh().iter());
+        dh->set_num_worker(h.dh().num_worker());
     }
 
-    void Push(){
+    virtual void Push(){
         CHECK(inited_);
         client_->Send(header_, diff_);
     }
@@ -73,7 +84,7 @@ public:
         dh->set_iter(header_.dh().iter()+1);
     }
 
-    void Pull(){
+    virtual void Pull(){
         CHECK(inited_);
         Comm::Header h;
         client_->Recv(&h, (void**)&data_);
@@ -81,6 +92,9 @@ public:
     }
 
     inline int iter() { return header_.dh().iter(); }
+    inline int num_worker() { return header_.dh().num_worker(); }
+    inline int bytes() { return header_.dh().length(); }
+
     inline T* data() { return data_; }
     inline T* diff() { return diff_; }
 
@@ -92,15 +106,16 @@ public:
         to_master_->Send(header4master);
     }
 
-private:
+protected:
     Comm::Header header_;
     shared_ptr<ZMQClient> to_master_;
     shared_ptr<ZMQClient> client_;
     T* data_;
     T* diff_;
+    int id_ = -1;
     int client_id_ = -1;
     bool inited_ = false;
-private:
+
     template <typename Type>
     Comm::DataHeader::DataType DataHeaderTypeWrapper(){
         if (std::is_same<Type, float>:: value){
@@ -113,6 +128,117 @@ private:
             return Comm::DataHeader::BYTE; 
         }
     }
+};
+
+template <typename T>
+class SVBWorker : public Worker<T>{
+public:
+    SVBWorker(int key, int bytes, T* data, T* diff, string master_addr,
+            caffe::Blob<T>* top, caffe::Blob<T>* bottom,
+            caffe::InnerProductLayer<T>* layer)
+        : Worker<T>(key, bytes, data, diff, master_addr)
+    {
+        top_ = top;
+        bottom_ = bottom;
+        layer_ = layer;
+        M_ = layer_->M();
+        K_ = layer_->K();
+        N_ = layer_->N();
+        transpose_ = layer_->transpose();
+
+        svb_bytes_total_ += top_->count()*sizeof(T);
+        svb_bytes_total_ += bottom_->count()*sizeof(T);
+        this->header_.mutable_dh()->add_svb_length(svb_bytes_total_);
+
+        svb_buf_ = (T*)new char[svb_bytes_total_];
+
+        LOG(INFO) << "top " << top_->shape_string();
+        LOG(INFO) << "bottom " << bottom_->shape_string();
+        LOG(INFO) << "svb_bytes_total_ " << svb_bytes_total_;
+    }
+
+    ~SVBWorker() { delete[] svb_buf_; }
+
+    void Push() override{
+        CHECK(this->inited_);
+        Comm::Header h = this->header_;
+        h.mutable_dh()->set_length(svb_bytes_total_);
+
+        // LOG(INFO) << "cudaMemcpy top_diff...";
+        cudaMemcpy(svb_buf_,
+                   top_->mutable_gpu_diff(),
+                   top_->count()*sizeof(T), cudaMemcpyDeviceToHost);
+        // LOG(INFO) << "cudaMemcpy bottom_data...";
+        cudaMemcpy(svb_buf_ + top_->count(),
+                   bottom_->mutable_gpu_data(),
+                   bottom_->count()*sizeof(T), cudaMemcpyDeviceToHost);
+
+        // LOG(INFO) << "Send svb_buf...";
+        this->client_->Send(h, svb_buf_);
+        LOG(INFO) << svb_buf_[0] << " " << svb_buf_[1] << " "
+            << svb_buf_[top_->count()] << " " << svb_buf_[top_->count()+1];
+    }
+
+    void Pull() override{
+        CHECK(this->inited_);
+        for (int i = 0; i < this->num_worker(); ++i){
+
+            caffe::Timer tim = caffe::Timer();
+            tim.Start();
+
+            Comm::Header h;
+            this->client_->Recv(&h, (void**)&svb_buf_);
+            CHECK(h.dh().iter() == this->header_.mutable_dh()->iter());
+            CHECK(h.dh().length() == svb_bytes_total_);
+
+            LOG(INFO) << svb_buf_[0] << " " << svb_buf_[1] << " "
+                << svb_buf_[top_->count()] << " " << svb_buf_[top_->count()+1];
+
+            tim.Stop();
+            LOG_IF(INFO, this->id_ == 10) << "Pull Buffer: " << tim.Seconds();
+
+            tim.Start();
+
+            // TODO: MATRIX MULTIPLICATION
+            T* top_diff = svb_buf_;
+            T* bottom_data = svb_buf_ + top_->count();
+            if (transpose_) {
+                // caffe::caffe_cpu_gemm<T>(CblasTrans, CblasNoTrans,
+                //     K_, N_, M_,
+                //     (T)-1., bottom_data, top_diff,
+                //     (T)1., this->data());
+                caffe::caffe_cpu_gemm<T>(CblasTrans, CblasNoTrans,
+                    K_, N_, M_,
+                    (T)-1., bottom_data, top_diff,
+                    (T)0., this->diff());
+            } else {
+                // caffe::caffe_cpu_gemm<T>(CblasTrans, CblasNoTrans,
+                //     N_, K_, M_,
+                //     (T)-1., top_diff, bottom_data,
+                //     (T)1., this->data());
+                caffe::caffe_cpu_gemm<T>(CblasTrans, CblasNoTrans,
+                    N_, K_, M_,
+                    (T)-1., top_diff, bottom_data,
+                    (T)0., this->diff());
+            }
+
+            tim.Stop();
+            LOG_IF(INFO, this->id_ == 10) << "Compute Buffer: " << tim.Seconds();
+        }
+    }
+
+    T* svb_buf() { return svb_buf_; }
+
+private:
+    vector<int> svb_bytes_;
+    int svb_bytes_total_ = 0;
+    T* svb_buf_;
+    caffe::Blob<T>* top_;
+    caffe::Blob<T>* bottom_;
+
+    caffe::InnerProductLayer<T>* layer_;
+    int M_, K_, N_;
+    bool transpose_;  ///< if true, assume transposed weights
 };
 
 }
