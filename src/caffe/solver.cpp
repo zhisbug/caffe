@@ -424,6 +424,7 @@ void Solver<Dtype>::AsyncGradGPUs(int id, bool is_init) {
   syncer_[id]->gpu2ps_diff();
   // since it is add in ps, we need diff = -diff
   Dtype* ps_bf_diff = ps_buffer_[id]->mutable_cpu_diff();
+  LOG(INFO) << ps_bf_diff[0] << " " << ps_bf_diff[1] << " " << ps_bf_diff[2];
   caffe_axpy<Dtype>(size, Dtype(-1), ps_bf_diff, ps_bf_diff);
 
   tim.Stop();
