@@ -333,11 +333,10 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
   tim2.Start();
   net_->Forward(&loss);
   tim2.Stop();
-  LOG(INFO) << "Forward " << tim2.Seconds() << "--------------";
+  // LOG(INFO) << "Forward " << tim2.Seconds() << "--------------";
 
   auto layers = net_->layers();
   vector<std::thread> threads;
-  //auto& learnable_params = net_->learnable_params();
 
   float acc = 0;
   tim2.Start();
@@ -359,18 +358,12 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
       acc += tim2.Seconds();
       tim2.Start();
       LOG(INFO) << "id " << i << " Start at "  << acc;
-      // threads.push_back(std::thread(&Solver<Dtype>::AsyncGradGPUs, this, i, false));
-      std::thread t(&Solver<Dtype>::AsyncGradGPUs, this, i, false);
-      t.join();
+      threads.push_back(std::thread(&Solver<Dtype>::AsyncGradGPUs, this, i));
+      // std::thread t(&Solver<Dtype>::AsyncGradGPUs, this, i, false);
+      // t.join();
     }
-
   }
-  // tim.Stop();
 
-  // if (Caffe::root_solver()) 
-  //   LOG(INFO) << "DWBP compute: " << tim.Seconds();
-
-  //tim.Start();
   for (int i = 0; i < threads.size(); ++i)
     threads[i].join();
   tim.Stop();
@@ -394,22 +387,24 @@ Dtype mydiff(int N, Dtype* X, Dtype* Y) {
   caffe_axpy<Dtype>(N, Dtype(-1), Y, buf.get());     // buf = -Y + buf
   caffe_abs<Dtype>(N, buf.get(), buf.get());
 
-  LOG(INFO) << "diff X " << X[0] << " " << X[1] << " " << X[2];
-  LOG(INFO) << "diff Y " << Y[0] << " " << Y[1] << " " << Y[2];
+  LOG(INFO) << "diff X " << X[0] << " " << X[N/2] << " " << X[N-1];
+  LOG(INFO) << "diff Y " << Y[0] << " " << Y[N/2] << " " << Y[N-1];
 
   Dtype sum = 0;
   for (int i = 0; i < N; ++i)
     sum += buf.get()[i];
-  Dtype norm = 0;
-  for (int i = 0; i < N; ++i)
-    norm += X[i] > 0 ? X[i] : -X[i];
 
-  return sum/norm;
+  // Dtype norm = 0;
+  // for (int i = 0; i < N; ++i)
+  //   norm += X[i] > 0 ? X[i] : -X[i];
+  // return sum/norm;
+
+  return sum;
 }
 
 // DWBP: collect gradients for the finished layer, and sync new paramters for all GPUs
 template <typename Dtype>
-void Solver<Dtype>::AsyncGradGPUs(int id, bool is_init) {
+void Solver<Dtype>::AsyncGradGPUs(int id) {
   CUDA_CHECK(cudaSetDevice(this->param_.device_id()));
   int size = ps_buffer_[id]->count();
   CHECK(size > 0) << "Trying to sync with size = 0";
@@ -419,50 +414,50 @@ void Solver<Dtype>::AsyncGradGPUs(int id, bool is_init) {
 
   Timer tim = Timer();
   tim.Start();
-
   // diff: GPU -> CPU
   syncer_[id]->gpu2ps_diff();
-  // since it is add in ps, we need diff = -diff
-  Dtype* ps_bf_diff = ps_buffer_[id]->mutable_cpu_diff();
-  LOG(INFO) << ps_bf_diff[0] << " " << ps_bf_diff[1] << " " << ps_bf_diff[2];
-  caffe_axpy<Dtype>(size, Dtype(-1), ps_bf_diff, ps_bf_diff);
-
   tim.Stop();
   LOG_IF(INFO, id == 10) << "@@@ GPU -> CPU: " << tim.Seconds();
+
+  // since it is add in ps, we need diff = -diff
+  Dtype* ps_bf_diff = ps_buffer_[id]->mutable_cpu_diff();
+  caffe_scal<Dtype>(size, Dtype(-1), ps_bf_diff);
   
   tim.Start();
-  // Sync with PS
+  // Push diff to PS
   worker_[id]->Push();
-  worker_[id]->IncIter();
   tim.Stop();
   LOG_IF(INFO, id == 10) << "@@@ Push PS: " << tim.Seconds();
 
+  worker_[id]->IncIter();
+
   tim.Start();
   // CHECK: ps_bf_data = ps_bf_data + ps_bf_diff 
-  bool check = true;
+  bool check = false;
   if (check) {
-    // Dtype* ps_bf_data = ps_buffer_[id]->mutable_cpu_data();
-    // std::shared_ptr<Blob<Dtype> > ps_bf_true(new Blob<Dtype>(ps_buffer_[id]->shape()));
-    // caffe_add<Dtype>(size, ps_bf_data, ps_bf_diff, ps_bf_true->mutable_cpu_data());
-
-    // worker_[id]->Pull();
-
-    // Dtype diff = mydiff(size, ps_bf_data, ps_bf_true->mutable_cpu_data());
-    // Dtype eps = 0.00001;
-    // CHECK(diff < eps && diff > -eps) << " at id " << id
-    //     << " with diff " << diff;
-
+    // ps_bf_true = ps_bf_data + ps_bf_diff
+    Dtype* ps_bf_data = ps_buffer_[id]->mutable_cpu_data();
     std::shared_ptr<Blob<Dtype> > ps_bf_true(new Blob<Dtype>(ps_buffer_[id]->shape()));
-    LOG(INFO) << ps_bf_diff[0] << " " << ps_bf_diff[1] << " " << ps_bf_diff[2];
-    // memcpy(ps_bf_true->mutable_cpu_diff(), ps_bf_diff, size);
+    caffe_add<Dtype>(size, ps_bf_data, ps_bf_diff, ps_bf_true->mutable_cpu_data());
 
     worker_[id]->Pull();
-    LOG(INFO) << ps_bf_diff[0] << " " << ps_bf_diff[1] << " " << ps_bf_diff[2];
 
-    Dtype diff = mydiff(size, ps_bf_true->mutable_cpu_diff(), ps_bf_diff);
+    Dtype diff = mydiff(size, ps_bf_data, ps_bf_true->mutable_cpu_data());
     Dtype eps = 0.00001;
     CHECK(diff < eps && diff > -eps) << " at id " << id
         << " with diff " << diff;
+
+    // std::shared_ptr<Blob<Dtype> > ps_bf_true(new Blob<Dtype>(ps_buffer_[id]->shape()));
+    // memcpy(ps_bf_true->mutable_cpu_diff(), ps_bf_diff, size);
+    // LOG(INFO) << ps_bf_diff[0] << " " << ps_bf_diff[1] << " " << ps_bf_diff[2];
+
+    // worker_[id]->Pull();
+    // LOG(INFO) << ps_bf_diff[0] << " " << ps_bf_diff[1] << " " << ps_bf_diff[2];
+
+    // Dtype diff = mydiff(size, ps_bf_true->mutable_cpu_diff(), ps_bf_diff);
+    // Dtype eps = 0.00001;
+    // CHECK(diff < eps && diff > -eps) << " at id " << id
+    //     << " with diff " << diff;
   } else {
     worker_[id]->Pull();
   }

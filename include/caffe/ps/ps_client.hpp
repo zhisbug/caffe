@@ -175,8 +175,8 @@ public:
 
         // LOG(INFO) << "Send svb_buf...";
         this->client_->Send(h, svb_buf_);
-        LOG(INFO) << svb_buf_[0] << " " << svb_buf_[1] << " "
-            << svb_buf_[top_->count()] << " " << svb_buf_[top_->count()+1];
+        // LOG(INFO) << svb_buf_[0] << " " << svb_buf_[1] << " "
+        //     << svb_buf_[top_->count()] << " " << svb_buf_[top_->count()+1];
     }
 
     void Pull() override{
@@ -191,8 +191,8 @@ public:
             CHECK(h.dh().iter() == this->header_.mutable_dh()->iter());
             CHECK(h.dh().length() == svb_bytes_total_);
 
-            LOG(INFO) << svb_buf_[0] << " " << svb_buf_[1] << " "
-                << svb_buf_[top_->count()] << " " << svb_buf_[top_->count()+1];
+            // LOG(INFO) << svb_buf_[0] << " " << svb_buf_[1] << " "
+            //     << svb_buf_[top_->count()] << " " << svb_buf_[top_->count()+1];
 
             tim.Stop();
             LOG_IF(INFO, this->id_ == 10) << "Pull Buffer: " << tim.Seconds();

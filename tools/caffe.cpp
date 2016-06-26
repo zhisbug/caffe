@@ -52,8 +52,8 @@ DEFINE_string(sighup_effect, "snapshot",
 
 DEFINE_int32(client_id, 0, "client_id");
 DEFINE_string(net_outputs, "", "The logging for petuum");
-DEFINE_bool(svb, true, "svb");
-DEFINE_bool(dwbp, false, "Enable DWBP or not?");
+DEFINE_bool(svb, false, "svb");
+DEFINE_bool(dwbp, true, "Enable DWBP or not?");
 DEFINE_string(recv_addr, "tcp://127.0.0.1:5554",
              "ps master address");
 DEFINE_string(master_addr, "tcp://127.0.0.1:5555",

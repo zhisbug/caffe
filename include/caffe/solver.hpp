@@ -47,19 +47,19 @@ public:
                    size_, cudaMemcpyDeviceToHost);
     }
     void ps2gpu_data(){
-        cudaMemcpy(gpu_param_->mutable_cpu_data(),
-                   ps_buffer_->mutable_gpu_data(), 
+        cudaMemcpy(gpu_param_->mutable_gpu_data(),
+                   ps_buffer_->mutable_cpu_data(), 
                    size_, cudaMemcpyHostToDevice);
     }
     void gpu2ps_diff(){
-        cudaMemcpy(gpu_param_->mutable_gpu_diff(),
-                   ps_buffer_->mutable_cpu_diff(), 
-                   size_, cudaMemcpyDeviceToHost);
-    }
-    void ps2gpu_diff(){
         cudaMemcpy(ps_buffer_->mutable_cpu_diff(),
                    gpu_param_->mutable_gpu_diff(), 
                    size_, cudaMemcpyHostToDevice);
+    }
+    void ps2gpu_diff(){
+        cudaMemcpy(gpu_param_->mutable_gpu_diff(),
+                   ps_buffer_->mutable_cpu_diff(), 
+                   size_, cudaMemcpyDeviceToHost);
     }
     Dtype* ps_cpu_diff(){
         return ps_buffer_->mutable_cpu_diff();
@@ -139,7 +139,7 @@ class Solver {
 
   //dwbp
   Dtype ForwardBackwardWithDWBP();
-  void AsyncGradGPUs(int learnable_params_idi, bool is_params);
+  void AsyncGradGPUs(int learnable_params_id);
 
  protected:
   // Make and apply the update value for the current iteration.
