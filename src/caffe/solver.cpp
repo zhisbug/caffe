@@ -327,19 +327,13 @@ void Solver<Dtype>::Step(int iters) {
 template <typename Dtype>
 Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
   Timer tim = Timer();
-  Timer tim2 = Timer();
-  Dtype loss;
   tim.Start();
-  tim2.Start();
+
+  Dtype loss;
   net_->Forward(&loss);
-  tim2.Stop();
-  // LOG(INFO) << "Forward " << tim2.Seconds() << "--------------";
 
   auto layers = net_->layers();
   vector<std::thread> threads;
-
-  float acc = 0;
-  tim2.Start();
   for (int i = layers.size() - 1; i >= 0; --i) {
     // LOG(INFO) << "@@@ Layer " << layers[i]->type();
 
@@ -354,10 +348,6 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
 
     // A separate thread to sync grads/params IO
     for (int i : learnable_params_id) {
-      tim2.Stop();
-      acc += tim2.Seconds();
-      tim2.Start();
-      LOG(INFO) << "id " << i << " Start at "  << acc;
       threads.push_back(std::thread(&Solver<Dtype>::AsyncGradGPUs, this, i));
       // std::thread t(&Solver<Dtype>::AsyncGradGPUs, this, i, false);
       // t.join();
@@ -372,7 +362,7 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
 
   static int mycount = 0;
   mycount++;
-  if (mycount > 2) {
+  if (mycount > 10) {
     worker_[0]->Terminate();
     LOG(FATAL) << "-----------------------";
   }
@@ -409,78 +399,20 @@ void Solver<Dtype>::AsyncGradGPUs(int id) {
   int size = ps_buffer_[id]->count();
   CHECK(size > 0) << "Trying to sync with size = 0";
 
-  Timer tim2 = Timer();
-  tim2.Start();
-
-  Timer tim = Timer();
-  tim.Start();
   // diff: GPU -> CPU
   syncer_[id]->gpu2ps_diff();
-  tim.Stop();
-  LOG_IF(INFO, id == 10) << "@@@ GPU -> CPU: " << tim.Seconds();
 
   // since it is add in ps, we need diff = -diff
   Dtype* ps_bf_diff = ps_buffer_[id]->mutable_cpu_diff();
   caffe_scal<Dtype>(size, Dtype(-1), ps_bf_diff);
   
-  tim.Start();
   // Push diff to PS
   worker_[id]->Push();
-  tim.Stop();
-  LOG_IF(INFO, id == 10) << "@@@ Push PS: " << tim.Seconds();
-
   worker_[id]->IncIter();
+  worker_[id]->Pull();
 
-  tim.Start();
-  // CHECK: ps_bf_data = ps_bf_data + ps_bf_diff 
-  bool check = false;
-  if (check) {
-    // ps_bf_true = ps_bf_data + ps_bf_diff
-    Dtype* ps_bf_data = ps_buffer_[id]->mutable_cpu_data();
-    std::shared_ptr<Blob<Dtype> > ps_bf_true(new Blob<Dtype>(ps_buffer_[id]->shape()));
-    caffe_add<Dtype>(size, ps_bf_data, ps_bf_diff, ps_bf_true->mutable_cpu_data());
-
-    worker_[id]->Pull();
-
-    Dtype diff = mydiff(size, ps_bf_data, ps_bf_true->mutable_cpu_data());
-    Dtype eps = 0.00001;
-    CHECK(diff < eps && diff > -eps) << " at id " << id
-        << " with diff " << diff;
-
-    // std::shared_ptr<Blob<Dtype> > ps_bf_true(new Blob<Dtype>(ps_buffer_[id]->shape()));
-    // memcpy(ps_bf_true->mutable_cpu_diff(), ps_bf_diff, size);
-    // LOG(INFO) << ps_bf_diff[0] << " " << ps_bf_diff[1] << " " << ps_bf_diff[2];
-
-    // worker_[id]->Pull();
-    // LOG(INFO) << ps_bf_diff[0] << " " << ps_bf_diff[1] << " " << ps_bf_diff[2];
-
-    // Dtype diff = mydiff(size, ps_bf_true->mutable_cpu_diff(), ps_bf_diff);
-    // Dtype eps = 0.00001;
-    // CHECK(diff < eps && diff > -eps) << " at id " << id
-    //     << " with diff " << diff;
-  } else {
-    worker_[id]->Pull();
-  }
-
-  tim.Stop();
-  LOG_IF(INFO, id == 10) << "@@@ Pull: " << tim.Seconds();
-
-  tim.Start();
   // CPU -> GPU
   syncer_[id]->ps2gpu_data();
-  tim.Stop();
-  LOG_IF(INFO, id == 10) << "@@@ CPU -> GPU: " << tim.Seconds();
-
-  tim2.Stop();
-  LOG(INFO) << "AsyncGradGPUs " << id << " takes " << tim2.Seconds();
-
-  // // The root solver collects gradients
-  // for (int i = 0; i < callbacks_.size(); ++i)
-  //   callbacks_[i]->on_gradients_ready(size, offset, id[0]);
-
-  // // Copy updated parameters to worker solvers 
-  // for (int i = 0; i < callbacks_.size(); ++i)
-  //   callbacks_[i]->on_start(size, offset, learnable_params_id[0]);
 }
 
 
