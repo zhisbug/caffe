@@ -120,6 +120,8 @@ public:
                                 header->mutable_dh()->set_iter(kv_iter_[k]);
                                 for(auto& id : to_workers_[k])
                                     server_->Send(id, *header, kv_pair_[k].get());
+                                if(k == 0)
+                                    LOG(INFO) << kv_iter_[k];
                             }
                         }
                     }

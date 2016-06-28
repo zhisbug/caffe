@@ -86,7 +86,7 @@ for ip in $unique_host_list; do
 
   cmd_prefix="'mkdir -p ${output_dir}; \
       mkdir -p ${log_path}; \
-      export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda-7.5/lib64/; \
+      export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda-7.5/lib64/:/usr/local/lib/; \
       ulimit -c unlimited; \
       GLOG_logtostderr=false \
       GLOG_stderrthreshold=0 \
@@ -106,7 +106,7 @@ for ip in $unique_host_list; do
       #--snapshot=${snapshot_filename}'"
   
   server_cmd="$cmd_prefix \
-      $serv_path tcp://${ip}:6666 ${mast_addr}'"
+      $serv_path tcp://${ip}:6665 ${mast_addr}'"
   
   if [ $client_id -eq 0 ]; then
     master_cmd="$cmd_prefix \

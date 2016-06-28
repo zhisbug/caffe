@@ -256,7 +256,7 @@ void Solver<Dtype>::Step(int iters) {
     if (param_.test_interval() && iter_ % param_.test_interval() == 0
         && (iter_ > 0 || param_.test_initialization())
         && Caffe::root_solver()) {
-      // TestAll();
+      TestAll();
       if (requested_early_exit_) {
         // Break out of the while loop because stop was requested while testing.
         break;
@@ -277,11 +277,6 @@ void Solver<Dtype>::Step(int iters) {
       loss += ForwardBackwardWithDWBP();
       tim.Stop();
       eps += tim.Seconds();
-
-      if (Caffe::root_solver() && iter_ % 20 == 19) {
-        LOG(INFO) << "DWBP compute: " << eps;
-        eps = 0;
-      }
     }
     loss /= param_.iter_size();
     // average the loss across iterations for smoothed reporting
@@ -289,6 +284,10 @@ void Solver<Dtype>::Step(int iters) {
     if (display) {
       LOG_IF(INFO, Caffe::root_solver()) << "Iteration " << iter_
           << ", loss = " << smoothed_loss_;
+      if (Caffe::root_solver()) {
+        LOG(INFO) << "DWBP compute: " << eps;
+        eps = 0;
+      }
       const vector<Blob<Dtype>*>& result = net_->output_blobs();
       int score_index = 0;
       for (int j = 0; j < result.size(); ++j) {
@@ -369,12 +368,12 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
   for (int i = 0; i < threads.size(); ++i)
     threads[i].join();
   tim.Stop();
-  if (Caffe::root_solver()) 
-    LOG(INFO) << "DWBP: " << tim.Seconds() << "--------------";
+  // if (Caffe::root_solver()) 
+  //   LOG(INFO) << "DWBP: " << tim.Seconds() << "--------------";
 
   static int mycount = 0;
   mycount++;
-  if (mycount > 20) {
+  if (mycount > 2000) {
     worker_[0]->Terminate();
     LOG(FATAL) << "-----------------------";
   }
