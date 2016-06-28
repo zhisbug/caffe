@@ -32,7 +32,7 @@ public:
         dh->set_type(DataHeaderTypeWrapper<T>());
         dh->set_length(bytes);
 
-        LOG(INFO) << "Register at master " << master_addr;
+        // LOG(INFO) << "Register at master " << master_addr;
         to_master_.reset(new ZMQClient(master_addr));
         Comm::Header header4master;
         Comm::CtrlHeader *ctrl4master = header4master.mutable_ch();

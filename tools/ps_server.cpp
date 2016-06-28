@@ -2,7 +2,6 @@
 
 #include "caffe/ps/ps_server.hpp"
 
-
 using namespace ps;
 int main(int argc, char **argv){
     CHECK(argc == 3);

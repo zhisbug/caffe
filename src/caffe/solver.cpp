@@ -100,12 +100,14 @@ void Solver<Dtype>::Init(const SolverParameter& param) {
                                  Caffe::master_addr())
            ));
       }
-      worker_[i]->InitWithPS(Caffe::client_id());
-
-      syncer_[i]->ps2gpu_data();
     }
-
   }
+
+  for(int i = 0; i < learnable_params.size(); ++i) {
+    worker_[i]->InitWithPS(Caffe::client_id());
+    syncer_[i]->ps2gpu_data();
+  }
+
 }
 
 template <typename Dtype>
@@ -348,9 +350,12 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
 
     // A separate thread to sync grads/params IO
     for (int i : learnable_params_id) {
-      threads.push_back(std::thread(&Solver<Dtype>::AsyncGradGPUs, this, i));
-      // std::thread t(&Solver<Dtype>::AsyncGradGPUs, this, i, false);
-      // t.join();
+      if (Caffe::dwbp()) {
+        threads.push_back(std::thread(&Solver<Dtype>::AsyncGradGPUs, this, i));
+      }else{
+        std::thread t(&Solver<Dtype>::AsyncGradGPUs, this, i);
+        t.join();
+      }
     }
   }
 
@@ -398,6 +403,7 @@ void Solver<Dtype>::AsyncGradGPUs(int id) {
   CUDA_CHECK(cudaSetDevice(this->param_.device_id()));
   int size = ps_buffer_[id]->count();
   CHECK(size > 0) << "Trying to sync with size = 0";
+  LOG(INFO) << "AsyncGradGPUs " << id;
 
   // diff: GPU -> CPU
   syncer_[id]->gpu2ps_diff();

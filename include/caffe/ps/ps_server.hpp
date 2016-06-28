@@ -86,6 +86,7 @@ public:
                     
                     if(header->dh().is_init()){
                         CHECK(is_init_[k] == false);
+                        LOG(INFO) << "Initing id " << k;
                         is_init_[k] = true;
                         kv_iter_[k] = header->dh().iter();
 

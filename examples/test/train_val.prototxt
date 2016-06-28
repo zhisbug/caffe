@@ -10,11 +10,10 @@ layer {
   transform_param {
     mirror: true
     crop_size: 227
-    mean_file: "/home/hao/tonyyang/poseidon/apps/caffe/data/ilsvrc12/imagenet_mean.binaryproto"
   }
   data_param {
-    source: "/media/hao/SeagateDisk2/dataset/imagenet/ilsvrc12_train_lmdb"
-    batch_size: 256
+    source: "/tank/projects/biglearning/hao/data/ilsvrc/ilsvrc12_train_lmdb"
+    batch_size: 64
     backend: LMDB
   }
 }
@@ -29,10 +28,9 @@ layer {
   transform_param {
     mirror: false
     crop_size: 227
-    mean_file: "/home/hao/tonyyang/poseidon/apps/caffe/data/ilsvrc12/imagenet_mean.binaryproto"
   }
   data_param {
-    source: "/media/hao/SeagateDisk2/dataset/imagenet/ilsvrc12_val_lmdb"
+    source: "/tank/projects/biglearning/hao/data/ilsvrc/ilsvrc12_val_lmdb"
     batch_size: 50
     backend: LMDB
   }
