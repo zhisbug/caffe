@@ -16,14 +16,19 @@ mast_path=${app_dir}/build/tools/${mastname}
 host_filename="${app_dir}/machinefiles/localserver"
 host_file=$(readlink -f $host_filename)
 
-dataset=imagenet
-
 ##=====================================
 ## Parameters
 ##=====================================
 
 # Input files:
-solver_filename="${app_dir}/examples/test/solver.prototxt"
+#dataset=imagenet
+#solver_filename="${app_dir}/examples/test/solver.prototxt"
+
+dataset=googlenet
+solver_prefix="${app_dir}/examples/test_googlenet/quick_solver"
+solver_postfix=".prototxt"
+solver_filename="${app_dir}/examples/test_googlenet/quick_solver.prototxt"
+
  # Uncomment this and line-93 if (re-)start training from a snapshot
 #snapshot_filename="${app_dir}/(SOLVERSTATE_FILE)"
 
@@ -64,7 +69,7 @@ for ip in $unique_host_list; do
 done
 echo "All done!"
 
-sleep 30
+sleep 3
 
 # ------------- Start Program ------------- #
 
@@ -77,6 +82,7 @@ caffe_cmd0=""
 for ip in $unique_host_list; do
   echo Running client $client_id on $ip
   log_path=${log_dir}.${client_id}
+  solver_filename=${solver_prefix}${client_id}${solver_postfix}
 
   cmd_prefix="'mkdir -p ${output_dir}; \
       mkdir -p ${log_path}; \
@@ -106,17 +112,6 @@ for ip in $unique_host_list; do
     master_cmd="$cmd_prefix \
         $mast_path ${mast_addr} ${#host_array[@]}'"
     ssh $ssh_options $ip bash -c $master_cmd &
-    caffe_cmd=""
-    caffe_cmd0="$cmd_prefix \
-        $prog_path train \
-        --master_addr ${mast_addr}
-        --client_id ${client_id} \
-        --solver=${solver_filename} \
-        --svb=$svb \
-        --dwbp=$dwbp \
-        --net_outputs=${net_outputs_prefix} \
-        --gpu=${devices}'" #\
-        #--snapshot=${snapshot_filename}'"
   fi
 
   ssh $ssh_options $ip bash -c $server_cmd &
@@ -124,8 +119,4 @@ for ip in $unique_host_list; do
 
   client_id=$(( client_id+1 ))
 done
-
-# Wait a few seconds for the other name node to set up
-sleep 30
-ssh $ssh_options $ip bash -c $caffe_cmd0 &
 

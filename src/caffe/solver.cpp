@@ -102,6 +102,10 @@ void Solver<Dtype>::Init(const SolverParameter& param) {
       }
     }
   }
+  
+  if (Caffe::client_id() == 0) {
+    sleep(10);
+  }
 
   for(int i = 0; i < learnable_params.size(); ++i) {
     worker_[i]->InitWithPS(Caffe::client_id());
@@ -334,6 +338,9 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
   Dtype loss;
   net_->Forward(&loss);
 
+  // LOG(INFO) << "net_->Forward(&loss)";
+  // sleep(10);
+
   auto layers = net_->layers();
   vector<std::thread> threads;
   for (int i = layers.size() - 1; i >= 0; --i) {
@@ -367,7 +374,7 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
 
   static int mycount = 0;
   mycount++;
-  if (mycount > 10) {
+  if (mycount > 20) {
     worker_[0]->Terminate();
     LOG(FATAL) << "-----------------------";
   }
@@ -403,7 +410,6 @@ void Solver<Dtype>::AsyncGradGPUs(int id) {
   CUDA_CHECK(cudaSetDevice(this->param_.device_id()));
   int size = ps_buffer_[id]->count();
   CHECK(size > 0) << "Trying to sync with size = 0";
-  LOG(INFO) << "AsyncGradGPUs " << id;
 
   // diff: GPU -> CPU
   syncer_[id]->gpu2ps_diff();
@@ -419,6 +425,8 @@ void Solver<Dtype>::AsyncGradGPUs(int id) {
 
   // CPU -> GPU
   syncer_[id]->ps2gpu_data();
+
+  // LOG(INFO) << "AsyncGradGPUs " << id;
 }
 
 
