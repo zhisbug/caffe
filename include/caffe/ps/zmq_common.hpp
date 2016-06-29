@@ -7,6 +7,7 @@
 #include <condition_variable>
 #include <unordered_map>
 #include <string>
+#include <chrono>
 #include <stdlib.h>
 #include <time.h>
 
@@ -82,6 +83,9 @@ class ZMQClient{
 public:
     ZMQClient(const std::string &dst) : dst_(dst){ 
         socket_.reset(new zmq::socket_t(ZMQContext::Get(), ZMQ_DEALER));
+        std::string id = std::to_string(std::chrono::duration_cast<std::chrono::nanoseconds>(
+                     std::chrono::system_clock::now().time_since_epoch()).count());
+        socket_->setsockopt(ZMQ_IDENTITY, id.c_str(), id.length());
         socket_->connect(dst);
 
         // std::unordered_map<std::string, std::shared_ptr<zmq::socket_t>>

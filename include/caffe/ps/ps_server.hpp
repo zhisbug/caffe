@@ -42,9 +42,9 @@ public:
                         header->mutable_ch()->set_id(id);
                     }
                     
-                    // if (header->dh().has_key())
-                    //     if (header->dh().key() < 3)
-                    //         LOG(INFO) << "receive " << header->dh().key() << " at " << header->dh().iter();
+                    if (header->dh().has_key())
+                        if (header->dh().key() < 2)
+                            LOG(INFO) << "recv " << header->dh().key() << " at " << header->dh().iter();
 
                     MD_PAIR value;
                     value = std::make_pair(
@@ -125,7 +125,7 @@ public:
                                 header->mutable_dh()->set_iter(kv_iter_[k]);
                                 for(auto& id : to_workers_[k])
                                     server_->Send(id, *header, kv_pair_[k].get());
-                                if(k < 3)
+                                if(k < 2)
                                     LOG(INFO) << "send " << k << " at " << kv_iter_[k];
                             }
                         }
@@ -160,7 +160,7 @@ private:
     void accumulate(int key, T *delta, int length){
         if (kv_pair_.find(key) == kv_pair_.end()){
             kv_pair_[key] = 
-                std::shared_ptr<char>(new char[length], [](char *p){delete p;});
+                std::shared_ptr<char>(new char[length], [](char *p){delete[] p;});
             memset(kv_pair_[key].get(), 0, length);
         }
         T *para = reinterpret_cast<T*>(kv_pair_[key].get());

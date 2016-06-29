@@ -419,11 +419,11 @@ void Solver<Dtype>::AsyncGradGPUs(int id) {
   
   // Push diff to PS
   worker_[id]->Push();
-  LOG_IF(INFO, id < 3) << "Pushed " << id << " at " << worker_[id]->iter();
+  LOG_IF(INFO, id < 2) << "Pushed " << id << " at " << worker_[id]->iter();
   worker_[id]->IncIter();
-  LOG_IF(INFO, id < 3) << "Inced " << id << " at " << worker_[id]->iter();
+  LOG_IF(INFO, id < 2) << "Inced " << id << " at " << worker_[id]->iter();
   worker_[id]->Pull();
-  LOG_IF(INFO, id < 3) << "Pulled " << id << " at " << worker_[id]->iter();
+  LOG_IF(INFO, id < 2) << "Pulled " << id << " at " << worker_[id]->iter();
 
   // CPU -> GPU
   syncer_[id]->ps2gpu_data();
