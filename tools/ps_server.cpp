@@ -1,5 +1,4 @@
 #include <iostream>
-
 #include "caffe/ps/ps_server.hpp"
 
 using namespace ps;

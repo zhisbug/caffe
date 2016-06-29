@@ -32,7 +32,7 @@ public:
         cond_.wait(lk, [this, key]{return table_.find(key)!=table_.end();});
         std::shared_ptr<T> ret = table_[key];
         table_.erase(key);
-        //cond_.notify_one(); // should not rely on spurious wake-up calls
+        cond_.notify_one(); // should not rely on spurious wake-up calls
         return ret;
     }
     static ThreadSafeHashTable<T> *get_table(){

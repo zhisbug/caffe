@@ -356,6 +356,7 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
 
     // A separate thread to sync grads/params IO
     for (int i : learnable_params_id) {
+      // if (i != 0) break;
       if (Caffe::dwbp()) {
         threads.push_back(std::thread(&Solver<Dtype>::AsyncGradGPUs, this, i));
       }else{
@@ -418,6 +419,7 @@ void Solver<Dtype>::AsyncGradGPUs(int id) {
   caffe_scal<Dtype>(size, Dtype(-1), ps_bf_diff);
   
   // Push diff to PS
+  LOG_IF(INFO, id == 0) << "PUSH " << id;
   worker_[id]->Push();
   worker_[id]->IncIter();
   worker_[id]->Pull();

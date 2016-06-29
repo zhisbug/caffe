@@ -34,7 +34,7 @@ solver_filename="${app_dir}/examples/test_googlenet/quick_solver.prototxt"
 
 # System parameters:
 svb=false
-dwbp=true
+dwbp=false
 
 ##=====================================
 
@@ -86,7 +86,8 @@ for ip in $unique_host_list; do
 
   cmd_prefix="'mkdir -p ${output_dir}; \
       mkdir -p ${log_path}; \
-      export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda-7.5/lib64/:/usr/local/lib/; \
+      export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/:/usr/local/cuda-7.5/lib64/; \
+      echo $LD_LIBRARY_PATH; \
       ulimit -c unlimited; \
       GLOG_logtostderr=false \
       GLOG_stderrthreshold=0 \
@@ -94,6 +95,9 @@ for ip in $unique_host_list; do
       GLOG_v=-1 \
       GLOG_minloglevel=0 \
       GLOG_vmodule=""" # \
+
+  server_cmd="$cmd_prefix \
+      $serv_path tcp://${ip}:6667 ${mast_addr}'"
 
   caffe_cmd="$cmd_prefix \
       $prog_path train \
@@ -104,9 +108,6 @@ for ip in $unique_host_list; do
       --net_outputs=${net_outputs_prefix} \
       --gpu=${devices} 2> ${log_dir}${client_id}'" #\
       #--snapshot=${snapshot_filename}'"
-  
-  server_cmd="$cmd_prefix \
-      $serv_path tcp://${ip}:6665 ${mast_addr}'"
   
   if [ $client_id -eq 0 ]; then
     master_cmd="$cmd_prefix \
