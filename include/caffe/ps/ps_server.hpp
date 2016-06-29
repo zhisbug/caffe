@@ -42,9 +42,9 @@ public:
                         header->mutable_ch()->set_id(id);
                     }
                     
-                    if (header->dh().has_key())
-                        if (header->dh().key() < 3)
-                            LOG(INFO) << "receive " << header->dh().key() << " at " << header->dh().iter();
+                    // if (header->dh().has_key())
+                    //     if (header->dh().key() < 3)
+                    //         LOG(INFO) << "receive " << header->dh().key() << " at " << header->dh().iter();
 
                     MD_PAIR value;
                     value = std::make_pair(
