@@ -34,7 +34,7 @@ solver_filename="${app_dir}/examples/test_googlenet/quick_solver.prototxt"
 
 # System parameters:
 svb=false
-dwbp=false
+dwbp=true
 
 ##=====================================
 
@@ -87,7 +87,6 @@ for ip in $unique_host_list; do
   cmd_prefix="'mkdir -p ${output_dir}; \
       mkdir -p ${log_path}; \
       export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/:/usr/local/cuda-7.5/lib64/; \
-      echo $LD_LIBRARY_PATH; \
       ulimit -c unlimited; \
       GLOG_logtostderr=false \
       GLOG_stderrthreshold=0 \
@@ -105,6 +104,7 @@ for ip in $unique_host_list; do
       --client_id ${client_id} \
       --solver=${solver_filename} \
       --svb=$svb \
+      --dwbp=$dwbp \
       --net_outputs=${net_outputs_prefix} \
       --gpu=${devices} 2> ${log_dir}${client_id}'" #\
       #--snapshot=${snapshot_filename}'"

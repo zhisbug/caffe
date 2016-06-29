@@ -41,11 +41,16 @@ public:
                     if (header->has_ch()){
                         header->mutable_ch()->set_id(id);
                     }
+                    
+                    if (header->dh().has_key())
+                        if (header->dh().key() < 3)
+                            LOG(INFO) << "receive " << header->dh().key() << " at " << header->dh().iter();
+
                     MD_PAIR value;
                     value = std::make_pair(
                         std::shared_ptr<Comm::Header>(header, 
                             [](Comm::Header *dh){delete dh;}),
-                        std::shared_ptr<char>((char*)buf, [](char *p){delete p;}));
+                        std::shared_ptr<char>((char*)buf, [](char *p){delete[] p;}));
                     queue_.push(value);
 
                     if (header->has_ch() &&
@@ -120,8 +125,8 @@ public:
                                 header->mutable_dh()->set_iter(kv_iter_[k]);
                                 for(auto& id : to_workers_[k])
                                     server_->Send(id, *header, kv_pair_[k].get());
-                                if(k == 0)
-                                    LOG(INFO) << kv_iter_[k];
+                                if(k < 3)
+                                    LOG(INFO) << "send " << k << " at " << kv_iter_[k];
                             }
                         }
                     }

@@ -360,8 +360,7 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
       if (Caffe::dwbp()) {
         threads.push_back(std::thread(&Solver<Dtype>::AsyncGradGPUs, this, i));
       }else{
-        std::thread t(&Solver<Dtype>::AsyncGradGPUs, this, i);
-        t.join();
+        AsyncGradGPUs(i);
       }
     }
   }
@@ -419,10 +418,12 @@ void Solver<Dtype>::AsyncGradGPUs(int id) {
   caffe_scal<Dtype>(size, Dtype(-1), ps_bf_diff);
   
   // Push diff to PS
-  LOG_IF(INFO, id == 0) << "PUSH " << id;
   worker_[id]->Push();
+  LOG_IF(INFO, id < 3) << "Pushed " << id << " at " << worker_[id]->iter();
   worker_[id]->IncIter();
+  LOG_IF(INFO, id < 3) << "Inced " << id << " at " << worker_[id]->iter();
   worker_[id]->Pull();
+  LOG_IF(INFO, id < 3) << "Pulled " << id << " at " << worker_[id]->iter();
 
   // CPU -> GPU
   syncer_[id]->ps2gpu_data();
