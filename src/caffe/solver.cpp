@@ -68,10 +68,12 @@ void Solver<Dtype>::Init(const SolverParameter& param) {
   auto learnable_params = net_->learnable_params();
   vector<shared_ptr<Layer<Dtype> > > layers = net_->layers();
 
+
   for (int l = 0; l < layers.size(); ++l) {
     vector<int> myid = layers[l]->learnable_params_id();
     for (int idx = 0; idx < myid.size(); ++idx) {
       int i = myid[idx];
+      if (i > 1) break;
       ps_buffer_.push_back(std::shared_ptr<Blob<Dtype> >
         (new Blob<Dtype>(learnable_params[i]->shape())));
       syncer_.push_back(std::shared_ptr<MySyncer<Dtype> >
@@ -108,6 +110,7 @@ void Solver<Dtype>::Init(const SolverParameter& param) {
   }
 
   for(int i = 0; i < learnable_params.size(); ++i) {
+    if (i > 1) break;
     worker_[i]->InitWithPS(Caffe::client_id());
     syncer_[i]->ps2gpu_data();
   }
@@ -356,17 +359,17 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
 
     // A separate thread to sync grads/params IO
     for (int i : learnable_params_id) {
-      //if (i > 5) break;
+      if (i > 1) break;
       if (Caffe::dwbp()) {
-        if (!start_sync_thread_){
-          start_sync_thread_ = true;
-          for(int i = 0; i < 4; ++i){
-            std::thread t = std::thread(&Solver<Dtype>::AsyncGradGPUsThread, this);
-            t.detach();
-          }
-        }
-        queue_.push(i);
-        //threads.push_back(std::thread(&Solver<Dtype>::AsyncGradGPUs, this, i));
+        //if (!start_sync_thread_){
+        //  start_sync_thread_ = true;
+        //  for(int i = 0; i < 4; ++i){
+        //    std::thread t = std::thread(&Solver<Dtype>::AsyncGradGPUsThread, this);
+        //    t.detach();
+        //  }
+        //}
+        //queue_.push(i);
+        threads.push_back(std::thread(&Solver<Dtype>::AsyncGradGPUs, this, i));
       }else{
         AsyncGradGPUs(i);
         sync_count_++;
@@ -374,13 +377,13 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
     }
   }
   
-  std::unique_lock<std::mutex> lk(m_);
-  while(sync_count_ != net_->learnable_params().size())
-    cond_.wait(lk);
-  sync_count_ = 0;
+  //std::unique_lock<std::mutex> lk(m_);
+  //while(sync_count_ != net_->learnable_params().size())
+  //  cond_.wait(lk);
+  //sync_count_ = 0;
 
-  //for (int i = 0; i < threads.size(); ++i)
-  //  threads[i].join();
+  for (int i = 0; i < threads.size(); ++i)
+    threads[i].join();
   tim.Stop();
   // if (Caffe::root_solver()) 
   //   LOG(INFO) << "DWBP: " << tim.Seconds() << "--------------";

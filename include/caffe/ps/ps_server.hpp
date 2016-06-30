@@ -3,6 +3,7 @@
 
 #include <thread>
 #include "zmq_common.hpp"
+#include <bitset>
 #include "caffe/util/benchmark.hpp"
 
 namespace ps{
@@ -41,6 +42,9 @@ public:
                     if (header->has_ch()){
                         header->mutable_ch()->set_id(id);
                     }
+                    LOG(INFO) << std::bitset<4>(id[0]) << std::bitset<4>(id[1])
+                        << std::bitset<4>(id[2]) << std::bitset<4>(id[4]) << std::bitset<4>(id[5]);
+      
                     
                     if (header->dh().has_key())
                         if (header->dh().key() < 2)
