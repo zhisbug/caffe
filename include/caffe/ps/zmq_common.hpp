@@ -83,8 +83,10 @@ class ZMQClient{
 public:
     ZMQClient(const std::string &dst) : dst_(dst){ 
         socket_.reset(new zmq::socket_t(ZMQContext::Get(), ZMQ_DEALER));
-        std::string id = std::to_string(std::chrono::duration_cast<std::chrono::nanoseconds>(
-                     std::chrono::system_clock::now().time_since_epoch()).count());
+        // std::string id = std::to_string(std::chrono::duration_cast<std::chrono::nanoseconds>(
+        //              std::chrono::system_clock::now().time_since_epoch()).count());
+        static int i = 0;
+        std::string id = std::to_string(i++);
         socket_->setsockopt(ZMQ_IDENTITY, id.c_str(), id.length());
         socket_->connect(dst);
 

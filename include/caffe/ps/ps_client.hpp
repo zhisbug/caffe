@@ -3,7 +3,7 @@
 
 #include <vector>
 #include <thread>
-#include "zmq_common.hpp"
+#include "caffe/ps/zmq_common.hpp"
 
 #include "caffe/blob.hpp"
 #include "caffe/layers/inner_product_layer.hpp"

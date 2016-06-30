@@ -96,7 +96,7 @@ for ip in $unique_host_list; do
       GLOG_vmodule=""" # \
 
   server_cmd="$cmd_prefix \
-      $serv_path tcp://${ip}:6667 ${mast_addr}'"
+      $serv_path tcp://${ip}:6666 ${mast_addr}'"
 
   caffe_cmd="$cmd_prefix \
       $prog_path train \
@@ -106,8 +106,8 @@ for ip in $unique_host_list; do
       --svb=$svb \
       --dwbp=$dwbp \
       --net_outputs=${net_outputs_prefix} \
-      --gpu=${devices}'" #\
-      #--gpu=${devices} 2> ${log_dir}${client_id}'" #\
+      --gpu=${devices} 2> ${log_dir}${client_id}'" #\
+      #--gpu=${devices}'" #\
       #--snapshot=${snapshot_filename}'"
   
   if [ $client_id -eq 0 ]; then

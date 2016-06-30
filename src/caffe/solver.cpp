@@ -356,17 +356,31 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
 
     // A separate thread to sync grads/params IO
     for (int i : learnable_params_id) {
-      // if (i != 0) break;
+      //if (i > 5) break;
       if (Caffe::dwbp()) {
-        threads.push_back(std::thread(&Solver<Dtype>::AsyncGradGPUs, this, i));
+        if (!start_sync_thread_){
+          start_sync_thread_ = true;
+          for(int i = 0; i < 4; ++i){
+            std::thread t = std::thread(&Solver<Dtype>::AsyncGradGPUsThread, this);
+            t.detach();
+          }
+        }
+        queue_.push(i);
+        //threads.push_back(std::thread(&Solver<Dtype>::AsyncGradGPUs, this, i));
       }else{
         AsyncGradGPUs(i);
+        sync_count_++;
       }
     }
   }
+  
+  std::unique_lock<std::mutex> lk(m_);
+  while(sync_count_ != net_->learnable_params().size())
+    cond_.wait(lk);
+  sync_count_ = 0;
 
-  for (int i = 0; i < threads.size(); ++i)
-    threads[i].join();
+  //for (int i = 0; i < threads.size(); ++i)
+  //  threads[i].join();
   tim.Stop();
   // if (Caffe::root_solver()) 
   //   LOG(INFO) << "DWBP: " << tim.Seconds() << "--------------";
@@ -401,6 +415,19 @@ Dtype mydiff(int N, Dtype* X, Dtype* Y) {
   // return sum/norm;
 
   return sum;
+}
+
+template <typename Dtype>
+void Solver<Dtype>::AsyncGradGPUsThread() {
+  while(true){
+    int id = queue_.wait_and_pop();
+    LOG(INFO) << "pop " << id;
+    AsyncGradGPUs(id);
+    
+    std::lock_guard<std::mutex> lk(m_);
+    sync_count_++;
+    cond_.notify_all();
+  }
 }
 
 // DWBP: collect gradients for the finished layer, and sync new paramters for all GPUs

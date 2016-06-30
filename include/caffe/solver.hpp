@@ -8,6 +8,7 @@
 #include "caffe/solver_factory.hpp"
 
 #include "caffe/ps/ps_client.hpp"
+#include "caffe/ps/zmq_common.hpp"
 
 namespace caffe {
 
@@ -140,6 +141,7 @@ class Solver {
   //dwbp
   Dtype ForwardBackwardWithDWBP();
   void AsyncGradGPUs(int learnable_params_id);
+  void AsyncGradGPUsThread();
 
  protected:
   // Make and apply the update value for the current iteration.
@@ -181,6 +183,12 @@ class Solver {
   vector<std::shared_ptr<Blob<Dtype> > > ps_buffer_; // one-to-one with learnable_params
   vector<std::shared_ptr<ps::Worker<Dtype> > > worker_;
   vector<std::shared_ptr<MySyncer<Dtype> > > syncer_;
+  
+  ps::ThreadSafeQueue<int> queue_;
+  bool start_sync_thread_ = false;
+  int sync_count_ = 0;
+  std::mutex m_;
+  std::condition_variable cond_;
 
   DISABLE_COPY_AND_ASSIGN(Solver);
 };
