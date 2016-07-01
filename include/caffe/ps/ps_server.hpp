@@ -17,6 +17,9 @@ public:
         LOG(INFO) << "Server Addr: \"" << my_addr << "\"";
         LOG(INFO) << "Master Addr: \"" << master_addr << "\"";
         server_ = std::shared_ptr<ZMQServer>(new ZMQServer(my_addr_));
+        //std::string back_addr_ = my_addr_;
+        //back_addr_[back_addr_.size()-1] = '7';
+        //back_server_ = std::shared_ptr<ZMQServer>(new ZMQServer(back_addr_));
 
         LOG(INFO) << "Connecting Master...";
         to_master_.reset(new ZMQClient(master_addr_));
@@ -42,8 +45,8 @@ public:
                     if (header->has_ch()){
                         header->mutable_ch()->set_id(id);
                     }
-                    LOG(INFO) << std::bitset<4>(id[0]) << std::bitset<4>(id[1])
-                        << std::bitset<4>(id[2]) << std::bitset<4>(id[4]) << std::bitset<4>(id[5]);
+                    LOG(INFO) << std::bitset<8>(id[0]) << std::bitset<8>(id[1])
+                        << std::bitset<8>(id[2]) << std::bitset<8>(id[4]) << std::bitset<8>(id[5]);
       
                     
                     if (header->dh().has_key())
@@ -176,6 +179,7 @@ private:
 private:
     std::string my_addr_, master_addr_;
     std::shared_ptr<ZMQServer> server_;
+    std::shared_ptr<ZMQServer> back_server_;
     std::shared_ptr<ZMQClient> to_master_;
 
     std::unordered_map<int, std::vector<std::string> > to_workers_;

@@ -68,7 +68,6 @@ void Solver<Dtype>::Init(const SolverParameter& param) {
   auto learnable_params = net_->learnable_params();
   vector<shared_ptr<Layer<Dtype> > > layers = net_->layers();
 
-
   for (int l = 0; l < layers.size(); ++l) {
     vector<int> myid = layers[l]->learnable_params_id();
     for (int idx = 0; idx < myid.size(); ++idx) {
@@ -390,7 +389,7 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
 
   static int mycount = 0;
   mycount++;
-  if (mycount > 2000) {
+  if (mycount > 20000) {
     worker_[0]->Terminate();
     LOG(FATAL) << "-----------------------";
   }

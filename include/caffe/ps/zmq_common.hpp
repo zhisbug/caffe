@@ -83,51 +83,38 @@ class ZMQClient{
 public:
     ZMQClient(const std::string &dst) : dst_(dst){ 
         socket_.reset(new zmq::socket_t(ZMQContext::Get(), ZMQ_DEALER));
-        // std::string id = std::to_string(std::chrono::duration_cast<std::chrono::nanoseconds>(
-        //              std::chrono::system_clock::now().time_since_epoch()).count());
-        // static int i = 0;
-        // std::string id = std::to_string(i++);
-        // socket_->setsockopt(ZMQ_IDENTITY, id.c_str(), id.length());
         socket_->connect(dst);
-
-        // std::unordered_map<std::string, std::shared_ptr<zmq::socket_t>>
-        //     &socket_pool_ = GetSockPool();;
-        // if (socket_pool_.find(dst) == socket_pool_.end()){
-        //     socket_.reset(new zmq::socket_t(ZMQContext::Get(), ZMQ_DEALER));
-        //     //srand(time(NULL));
-        //     // std::string id = std::to_string(rand()%10000) + std::to_string(time(NULL));;
-        //     // std::string id = std::to_string(std::chrono::duration_cast<std::chrono::nanoseconds>(
-        //     //             std::chrono::system_clock::now().time_since_epoch()).count());
-        //     // LOG(INFO) << id;
-        //     // socket_->setsockopt(ZMQ_IDENTITY, id.c_str(), id.length());
-        //     socket_->connect(dst);
-        //     socket_pool_[dst] = socket_;
-        // }else{
-        //     LOG(FATAL) << "Impossible";
-        //     socket_ = socket_pool_[dst];
-        // }
     }
     ~ZMQClient(){
-        // std::unordered_map<std::string, std::shared_ptr<zmq::socket_t>> 
-        //     &socket_pool_ = GetSockPool();
-        // if (socket_pool_[dst_].use_count() == 2)
-        //     socket_pool_.erase(dst_);
     }
     void Send(const Comm::Header &header, const void *buf = NULL){
+        CHECK(socket_->send("", 0, ZMQ_SNDMORE) == 0);
+
         zmq::message_t request;
         std::string h_array;
         header.SerializeToString(&h_array);
         request.rebuild(h_array.c_str(), h_array.length());
         if (header.has_dh()){
             CHECK(buf);
+            const char* c = h_array.c_str();
+            LOG(INFO) << c[0] << c[1] << c[2] << c[3]; 
             CHECK(socket_->send(request, ZMQ_SNDMORE));
+            float* f = (float*)buf;
+            LOG(INFO) << f[0] << f[1] << f[2] << f[3];
             CHECK(socket_->send(buf, header.dh().length()) == header.dh().length());
         }else{
             CHECK(header.has_ch());
             CHECK(socket_->send(request, ZMQ_DONTWAIT));
+            //CHECK(socket_->send(request, ZMQ_DONTWAIT) == h_array.length());
         }
     }
     void Recv(Comm::Header *header, void** buf = NULL){
+        zmq::message_t envelope;
+        CHECK(socket_->recv(&envelope));
+        std::string es((char*)envelope.data(), envelope.size());
+        LOG(INFO) << "envelope: " << envelope.size() << " " << es;
+        CHECK(envelope.more());
+
         zmq::message_t h_m;
         socket_->recv(&h_m);
         CHECK(header->ParseFromArray(h_m.data(), h_m.size()));
@@ -172,6 +159,10 @@ public:
         CHECK(id_m.more());
         *id = std::move(std::string((char*)id_m.data(), id_m.size()));
 
+        zmq::message_t envelope;
+        CHECK(socket_->recv(&envelope));
+        CHECK(envelope.more());
+
         zmq::message_t h_m;
         socket_->recv(&h_m);
         CHECK(header->ParseFromArray(h_m.data(), h_m.size()));
@@ -189,11 +180,17 @@ public:
         zmq::message_t id_m;
         id_m.rebuild(id.c_str(), id.length());
         socket_->send(id_m, ZMQ_SNDMORE);
+
+        CHECK(socket_->send("", 0, ZMQ_SNDMORE) == 0);
+        //zmq::message_t envelope("", 0);
+        //CHECK(socket_->send(envelope, ZMQ_SNDMORE) == 0);
+
         zmq::message_t h_m;
         std::string h_array;
         header.SerializeToString(&h_array);
         h_m.rebuild(h_array.c_str(), h_array.length());
         if (header.has_dh()){
+            //CHECK(socket_->send(h_m, ZMQ_SNDMORE) == h_array.length());
             CHECK(socket_->send(h_m, ZMQ_SNDMORE));
             CHECK(socket_->send(buf, header.dh().length()) == header.dh().length());
             // float* p = (float*) (buf);
@@ -201,6 +198,7 @@ public:
         }else{
             CHECK(header.has_ch());
             CHECK(socket_->send(h_m));
+            //CHECK(socket_->send(h_m) == h_array.length());
         }
     }
 private:
