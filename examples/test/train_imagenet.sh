@@ -106,8 +106,8 @@ for ip in $unique_host_list; do
       --svb=$svb \
       --dwbp=$dwbp \
       --net_outputs=${net_outputs_prefix} \
-      --gpu=${devices} 2> ${log_dir}${client_id}'" #\
-      #--gpu=${devices}'" #\
+      --gpu=${devices}'" #\
+      #--gpu=${devices} 2> ${log_dir}${client_id}'" #\
       #--snapshot=${snapshot_filename}'"
   
   if [ $client_id -eq 0 ]; then

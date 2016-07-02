@@ -17,9 +17,6 @@ public:
         LOG(INFO) << "Server Addr: \"" << my_addr << "\"";
         LOG(INFO) << "Master Addr: \"" << master_addr << "\"";
         server_ = std::shared_ptr<ZMQServer>(new ZMQServer(my_addr_));
-        //std::string back_addr_ = my_addr_;
-        //back_addr_[back_addr_.size()-1] = '7';
-        //back_server_ = std::shared_ptr<ZMQServer>(new ZMQServer(back_addr_));
 
         LOG(INFO) << "Connecting Master...";
         to_master_.reset(new ZMQClient(master_addr_));
@@ -33,49 +30,15 @@ public:
 
         LOG(INFO) << "Launching producer and consumer...";
 
-        producer_ = std::shared_ptr<std::thread>(new std::thread([this]
-            {
-                while(1){
-                    Comm::Header *header = new Comm::Header();
-                    std::string id;
-                    void *buf = NULL;
-                    //LOG(INFO) << "Procuder Receiving";
-                    server_->Recv(&id, header, &buf);
-                    //LOG(INFO) << "Receive a DataHeader? " << header->has_dh();
-                    if (header->has_ch()){
-                        header->mutable_ch()->set_id(id);
-                    }
-                    LOG(INFO) << std::bitset<8>(id[0]) << std::bitset<8>(id[1])
-                        << std::bitset<8>(id[2]) << std::bitset<8>(id[4]) << std::bitset<8>(id[5]);
-      
-                    
-                    if (header->dh().has_key())
-                        if (header->dh().key() < 2)
-                            LOG(INFO) << "recv " << header->dh().key() << " at " << header->dh().iter();
-
-                    MD_PAIR value;
-                    value = std::make_pair(
-                        std::shared_ptr<Comm::Header>(header, 
-                            [](Comm::Header *dh){delete dh;}),
-                        std::shared_ptr<char>((char*)buf, [](char *p){delete[] p;}));
-                    queue_.push(value);
-
-                    if (header->has_ch() &&
-                        header->ch().op() == Comm::CtrlHeader::TERMINATE){
-                        LOG(INFO) << "Producer Terminating...";
-                        break; 
-                    }
-                }
-            }));
-        
         consumer_ = std::shared_ptr<std::thread>(new std::thread([this]
             {
                 while(1){
-                    MD_PAIR one_pair = queue_.wait_and_pop();
-                    std::shared_ptr<Comm::Header> header = one_pair.first;
+                    std::shared_ptr<Comm::Header> header{new Comm::Header()};
+                    std::string id;
+                    void *buf_temp = NULL;
+                    server_->Recv(&id, header.get(), &buf_temp);
 
                     if(header->has_ch()){
-                        std::string id = header->ch().id();
                         if(header->ch().op() == Comm::CtrlHeader::ADD){
                             CHECK(header->ch().role() == Comm::CtrlHeader::WORKER);
                             int k = header->ch().key();
@@ -94,7 +57,7 @@ public:
 
                     CHECK(header->has_dh());
                     int k = header->dh().key();
-                    std::shared_ptr<char> buf = one_pair.second;
+                    std::shared_ptr<char> buf{(char*) buf_temp};
                     
                     if(header->dh().is_init()){
                         CHECK(is_init_[k] == false);
@@ -132,8 +95,6 @@ public:
                                 header->mutable_dh()->set_iter(kv_iter_[k]);
                                 for(auto& id : to_workers_[k])
                                     server_->Send(id, *header, kv_pair_[k].get());
-                                if(k < 2)
-                                    LOG(INFO) << "send " << k << " at " << kv_iter_[k];
                             }
                         }
                     }
@@ -142,7 +103,6 @@ public:
     }
 
     void Run(){
-        producer_->join();
         consumer_->join();
     }
 
@@ -179,7 +139,6 @@ private:
 private:
     std::string my_addr_, master_addr_;
     std::shared_ptr<ZMQServer> server_;
-    std::shared_ptr<ZMQServer> back_server_;
     std::shared_ptr<ZMQClient> to_master_;
 
     std::unordered_map<int, std::vector<std::string> > to_workers_;

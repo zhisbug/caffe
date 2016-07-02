@@ -72,7 +72,7 @@ void Solver<Dtype>::Init(const SolverParameter& param) {
     vector<int> myid = layers[l]->learnable_params_id();
     for (int idx = 0; idx < myid.size(); ++idx) {
       int i = myid[idx];
-      if (i > 1) break;
+      //if (i > 1) break;
       ps_buffer_.push_back(std::shared_ptr<Blob<Dtype> >
         (new Blob<Dtype>(learnable_params[i]->shape())));
       syncer_.push_back(std::shared_ptr<MySyncer<Dtype> >
@@ -109,7 +109,7 @@ void Solver<Dtype>::Init(const SolverParameter& param) {
   }
 
   for(int i = 0; i < learnable_params.size(); ++i) {
-    if (i > 1) break;
+    //if (i > 1) break;
     worker_[i]->InitWithPS(Caffe::client_id());
     syncer_[i]->ps2gpu_data();
   }
@@ -341,33 +341,33 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
 
   // LOG(INFO) << "net_->Forward(&loss)";
   // sleep(10);
+  
+  float acc = 0;
+  Timer tim2 = Timer();
 
   auto layers = net_->layers();
   vector<std::thread> threads;
   for (int i = layers.size() - 1; i >= 0; --i) {
     // LOG(INFO) << "@@@ Layer " << layers[i]->type();
+    tim2.Start();
 
     net_->BackwardFromTo(i, i); // Backward layer i
     vector<int> learnable_params_id = layers[i]->learnable_params_id();
     if (learnable_params_id.empty())
       continue;
 
-    // Do computation at main stream: diff = diff * lr
+    // Do computation at main stream: diff = -diff * lr
     // It appears that streams switch on GPU has large overhead
     ApplyUpdateParams(learnable_params_id);
 
+    tim2.Stop();
+    acc += tim2.Seconds();
+    LOG(INFO) << learnable_params_id[0] << " starts at " << acc;
+
     // A separate thread to sync grads/params IO
     for (int i : learnable_params_id) {
-      if (i > 1) break;
+      //if (i > 1) break;
       if (Caffe::dwbp()) {
-        //if (!start_sync_thread_){
-        //  start_sync_thread_ = true;
-        //  for(int i = 0; i < 4; ++i){
-        //    std::thread t = std::thread(&Solver<Dtype>::AsyncGradGPUsThread, this);
-        //    t.detach();
-        //  }
-        //}
-        //queue_.push(i);
         threads.push_back(std::thread(&Solver<Dtype>::AsyncGradGPUs, this, i));
       }else{
         AsyncGradGPUs(i);
@@ -389,7 +389,7 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
 
   static int mycount = 0;
   mycount++;
-  if (mycount > 20000) {
+  if (mycount > 100) {
     worker_[0]->Terminate();
     LOG(FATAL) << "-----------------------";
   }
@@ -438,29 +438,24 @@ void Solver<Dtype>::AsyncGradGPUs(int id) {
   CUDA_CHECK(cudaSetDevice(this->param_.device_id()));
   int size = ps_buffer_[id]->count();
   CHECK(size > 0) << "Trying to sync with size = 0";
+  
+  Timer tim = Timer();
+  tim.Start();
 
   // diff: GPU -> CPU
   syncer_[id]->gpu2ps_diff();
-
-  // since it is add in ps, we need diff = -diff
-  Dtype* ps_bf_diff = ps_buffer_[id]->mutable_cpu_diff();
-  caffe_scal<Dtype>(size, Dtype(-1), ps_bf_diff);
   
-  // Push diff to PS
-  worker_[id]->Push();
-  LOG_IF(INFO, id < 2) << "Pushed " << id << " at " << worker_[id]->iter();
-  worker_[id]->IncIter();
-  LOG_IF(INFO, id < 2) << "Inced " << id << " at " << worker_[id]->iter();
-  worker_[id]->Pull();
-  LOG_IF(INFO, id < 2) << "Pulled " << id << " at " << worker_[id]->iter();
+  //// Push diff to PS
+  //worker_[id]->Push();
+  //worker_[id]->IncIter();
+  //worker_[id]->Pull();
 
   // CPU -> GPU
   syncer_[id]->ps2gpu_data();
 
-  // LOG(INFO) << "AsyncGradGPUs " << id;
+  tim.Stop();
+  LOG(INFO) << "AsyncGradGPUs " << id << " takes " << tim.Seconds();
 }
-
-
 
 template <typename Dtype>
 void Solver<Dtype>::Solve(const char* resume_file) {

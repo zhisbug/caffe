@@ -140,13 +140,15 @@ void SGDSolver<Dtype>::ApplyUpdateParams(const vector<int> learnable_params_id) 
     }
   }
 
+  const vector<Blob<Dtype>*>& net_params = this->net_->learnable_params();
   for (int i = 0; i < learnable_params_id.size(); ++i) {
     int param_id = learnable_params_id[i];
     Normalize(param_id);
     Regularize(param_id);
     ComputeUpdateValue(param_id, rate);
-    //Update(param_id);
-    // this->net_->learnable_params()[param_id]->Update();
+    
+    Blob<Dtype>* my_param = net_params[param_id];
+    caffe_gpu_scal<Dtype>(my_param->count(), Dtype(-1), my_param->mutable_gpu_diff());
   }
 }
 
