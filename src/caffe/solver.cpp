@@ -362,13 +362,19 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
 
     tim2.Stop();
     acc += tim2.Seconds();
-    LOG(INFO) << learnable_params_id[0] << " starts at " << acc;
+    //LOG(INFO) << learnable_params_id[0] << " starts at " << acc;
 
     // A separate thread to sync grads/params IO
     for (int i : learnable_params_id) {
       //if (i > 1) break;
       if (Caffe::dwbp()) {
-        threads.push_back(std::thread(&Solver<Dtype>::AsyncGradGPUs, this, i));
+        if (!start_sync_thread_) {
+          start_sync_thread_ = true;
+          std::thread t = std::thread(&Solver<Dtype>::AsyncGradGPUsThread, this);
+          t.detach();
+        }
+        queue_.push(i);
+        //threads.push_back(std::thread(&Solver<Dtype>::AsyncGradGPUs, this, i));
       }else{
         AsyncGradGPUs(i);
         sync_count_++;
@@ -389,7 +395,7 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
 
   static int mycount = 0;
   mycount++;
-  if (mycount > 100) {
+  if (mycount > 200) {
     worker_[0]->Terminate();
     LOG(FATAL) << "-----------------------";
   }
@@ -423,7 +429,6 @@ template <typename Dtype>
 void Solver<Dtype>::AsyncGradGPUsThread() {
   while(true){
     int id = queue_.wait_and_pop();
-    LOG(INFO) << "pop " << id;
     AsyncGradGPUs(id);
     
     std::lock_guard<std::mutex> lk(m_);
@@ -446,15 +451,15 @@ void Solver<Dtype>::AsyncGradGPUs(int id) {
   syncer_[id]->gpu2ps_diff();
   
   //// Push diff to PS
-  //worker_[id]->Push();
-  //worker_[id]->IncIter();
-  //worker_[id]->Pull();
+  worker_[id]->Push();
+  worker_[id]->IncIter();
+  worker_[id]->Pull();
 
   // CPU -> GPU
   syncer_[id]->ps2gpu_data();
 
   tim.Stop();
-  LOG(INFO) << "AsyncGradGPUs " << id << " takes " << tim.Seconds();
+  //LOG(INFO) << "AsyncGradGPUs " << id << " takes " << tim.Seconds();
 }
 
 template <typename Dtype>
