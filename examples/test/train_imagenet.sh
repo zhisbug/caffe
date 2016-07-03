@@ -102,6 +102,7 @@ for ip in $unique_host_list; do
       $prog_path train \
       --master_addr ${mast_addr}
       --client_id ${client_id} \
+      --total_client_num ${#host_array[@]} \
       --solver=${solver_filename} \
       --svb=$svb \
       --dwbp=$dwbp \

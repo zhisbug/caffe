@@ -86,6 +86,17 @@ void DataReader::Body::InternalThreadEntry() {
       read_one(cursor.get(), qp.get());
       qps.push_back(qp);
     }
+
+    // In NFS, multiple nodes read a shared LMDB/LDB file, 
+    // need to shift input data index
+    for (int i = 0; i < Caffe::client_id(); ++i) {
+      cursor->Next();
+      if (!cursor->valid()) {
+        DLOG(INFO) << "Restarting data prefetching from start.";
+        cursor->SeekToFirst();
+      }
+    }
+
     // Main loop
     while (!must_stop()) {
       for (int i = 0; i < solver_count; ++i) {
@@ -108,11 +119,23 @@ void DataReader::Body::read_one(db::Cursor* cursor, QueuePair* qp) {
   datum->ParseFromString(cursor->value());
   qp->full_.push(datum);
 
-  // go to the next iter
-  cursor->Next();
-  if (!cursor->valid()) {
-    DLOG(INFO) << "Restarting data prefetching from start.";
-    cursor->SeekToFirst();
+  static bool called_once = false;
+  if (!called_once) {
+    called_once = true;
+    cursor->Next();
+    if (!cursor->valid()) {
+      DLOG(INFO) << "Restarting data prefetching from start.";
+      cursor->SeekToFirst();
+    }
+  }else{
+    for (int i = 0; i < Caffe::total_client_num(); ++i) {
+      // go to the next iter
+      cursor->Next();
+      if (!cursor->valid()) {
+        DLOG(INFO) << "Restarting data prefetching from start.";
+        cursor->SeekToFirst();
+      }
+    }
   }
 }
 

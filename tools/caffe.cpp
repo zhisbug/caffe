@@ -51,6 +51,7 @@ DEFINE_string(sighup_effect, "snapshot",
 // -------- PS
 
 DEFINE_int32(client_id, 0, "client_id");
+DEFINE_int32(total_client_num, 0, "total_client_num");
 DEFINE_string(net_outputs, "", "The logging for petuum");
 DEFINE_bool(svb, false, "svb");
 DEFINE_bool(dwbp, true, "Enable DWBP or not?");
@@ -213,6 +214,7 @@ int train() {
   
   // -------- PS
   Caffe::set_client_id(FLAGS_client_id);
+  Caffe::set_total_client_num(FLAGS_total_client_num);
   Caffe::set_net_outputs(FLAGS_net_outputs); 
   Caffe::set_svb(FLAGS_svb);
   Caffe::set_dwbp(FLAGS_dwbp);

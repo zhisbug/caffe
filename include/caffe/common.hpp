@@ -174,6 +174,9 @@ class Caffe {
   inline static void set_client_id(int val) { Get().client_id_ = val; }
   inline static int client_id() {return Get().client_id_; }
 
+  inline static void set_total_client_num(int val) { Get().total_client_num_ = val; }
+  inline static int total_client_num() {return Get().total_client_num_; }
+
   inline static bool dwbp() { return Get().dwbp_; }
   inline static void set_dwbp(bool val) { Get().dwbp_ = val; }
   
@@ -198,6 +201,7 @@ class Caffe {
   string net_outputs_;
   bool svb_;
   int client_id_;
+  int total_client_num_;
   bool dwbp_;
   string recv_addr_;
   string master_addr_;
