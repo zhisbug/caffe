@@ -366,6 +366,7 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
 
     // A separate thread to sync grads/params IO
     for (int i : learnable_params_id) {
+      //break;
       //if (i > 1) break;
       if (Caffe::dwbp()) {
         if (!start_sync_thread_) {
@@ -396,7 +397,8 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
   static int mycount = 0;
   mycount++;
   if (mycount > 200) {
-    worker_[0]->Terminate();
+    if (Caffe::client_id() == 0)
+      worker_[0]->Terminate();
     LOG(FATAL) << "-----------------------";
   }
 

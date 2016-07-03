@@ -21,13 +21,13 @@ host_file=$(readlink -f $host_filename)
 ##=====================================
 
 # Input files:
-#dataset=imagenet
+
+#dataset=alexnet
 #solver_filename="${app_dir}/examples/test/solver.prototxt"
 
 dataset=googlenet
 solver_prefix="${app_dir}/examples/test_googlenet/quick_solver"
 solver_postfix=".prototxt"
-solver_filename="${app_dir}/examples/test_googlenet/quick_solver.prototxt"
 
  # Uncomment this and line-93 if (re-)start training from a snapshot
 #snapshot_filename="${app_dir}/(SOLVERSTATE_FILE)"
