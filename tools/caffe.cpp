@@ -51,7 +51,7 @@ DEFINE_string(sighup_effect, "snapshot",
 // -------- PS
 
 DEFINE_int32(client_id, 0, "client_id");
-DEFINE_int32(total_client_num, 0, "total_client_num");
+DEFINE_int32(total_client_num, 1, "total_client_num");
 DEFINE_string(net_outputs, "", "The logging for petuum");
 DEFINE_bool(svb, false, "svb");
 DEFINE_bool(dwbp, true, "Enable DWBP or not?");

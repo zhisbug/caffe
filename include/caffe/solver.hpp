@@ -65,6 +65,9 @@ public:
     Dtype* ps_cpu_diff(){
         return ps_buffer_->mutable_cpu_diff();
     }
+    Dtype* ps_cpu_data(){
+        return ps_buffer_->mutable_cpu_data();
+    }
 private:
     Blob<Dtype>* ps_buffer_;
     Blob<Dtype>* gpu_param_;
@@ -185,7 +188,7 @@ class Solver {
   vector<std::shared_ptr<MySyncer<Dtype> > > syncer_;
   
   ps::ThreadSafeQueue<int> queue_;
-  bool start_sync_thread_ = false;
+  int start_sync_thread_ = 4;
   int sync_count_ = 0;
   std::mutex m_;
   std::condition_variable cond_;

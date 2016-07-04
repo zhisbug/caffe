@@ -148,7 +148,7 @@ void SGDSolver<Dtype>::ApplyUpdateParams(const vector<int> learnable_params_id) 
     ComputeUpdateValue(param_id, rate);
     
     Blob<Dtype>* my_param = net_params[param_id];
-    caffe_gpu_scal<Dtype>(my_param->count(), Dtype(-1), my_param->mutable_gpu_diff());
+    caffe_gpu_scal<Dtype>(my_param->count(), Dtype(-1.0), my_param->mutable_gpu_diff());
   }
 }
 

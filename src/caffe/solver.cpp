@@ -350,6 +350,12 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
   for (int i = layers.size() - 1; i >= 0; --i) {
     // LOG(INFO) << "@@@ Layer " << layers[i]->type();
     tim2.Start();
+    
+    //Blob<Dtype>* bottom_data = net_->bottom_vecs()[i][0];
+    //LOG(INFO) << "bottom " << i << " size " << bottom_data->count();
+    //LOG(INFO) << bottom_data->mutable_cpu_data()[0] << " "
+    //  << bottom_data->mutable_cpu_data()[1] << " "
+    //  << bottom_data->mutable_cpu_data()[2];
 
     net_->BackwardFromTo(i, i); // Backward layer i
     vector<int> learnable_params_id = layers[i]->learnable_params_id();
@@ -369,8 +375,8 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
       //break;
       //if (i > 1) break;
       if (Caffe::dwbp()) {
-        if (!start_sync_thread_) {
-          start_sync_thread_ = true;
+        if (start_sync_thread_ > 0) {
+          start_sync_thread_ -= 1;
           std::thread t = std::thread(&Solver<Dtype>::AsyncGradGPUsThread, this);
           t.detach();
         }
@@ -383,10 +389,10 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
     }
   }
   
-  //std::unique_lock<std::mutex> lk(m_);
-  //while(sync_count_ != net_->learnable_params().size())
-  //  cond_.wait(lk);
-  //sync_count_ = 0;
+  std::unique_lock<std::mutex> lk(m_);
+  while(sync_count_ != net_->learnable_params().size())
+    cond_.wait(lk);
+  sync_count_ = 0;
 
   for (int i = 0; i < threads.size(); ++i)
     threads[i].join();
@@ -396,7 +402,7 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
 
   static int mycount = 0;
   mycount++;
-  if (mycount > 200) {
+  if (mycount > 4000) {
     if (Caffe::client_id() == 0)
       worker_[0]->Terminate();
     LOG(FATAL) << "-----------------------";
@@ -449,13 +455,24 @@ void Solver<Dtype>::AsyncGradGPUs(int id) {
   Timer tim = Timer();
   tim.Start();
 
+  Dtype* data = syncer_[id]->ps_cpu_data();
+  Dtype* diff = syncer_[id]->ps_cpu_diff();
+
   // diff: GPU -> CPU
   syncer_[id]->gpu2ps_diff();
+
+  //LOG_IF(INFO, (id==0)) 
+  //  << data[0] << " " << data[1] << " " << data[2];
+  //LOG_IF(INFO, (id==0)) 
+  //  << diff[0] << " " << diff[1] << " " << diff[2];
   
   //// Push diff to PS
   worker_[id]->Push();
   worker_[id]->IncIter();
   worker_[id]->Pull();
+
+  //LOG_IF(INFO, (id==0)) 
+  //  << data[0] << " " << data[1] << " " << data[2];
 
   // CPU -> GPU
   syncer_[id]->ps2gpu_data();

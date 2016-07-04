@@ -92,6 +92,7 @@ void DataLayer<Dtype>::load_batch(Batch<Dtype>* batch) {
     // Copy label.
     if (this->output_labels_) {
       top_label[item_id] = datum.label();
+      //LOG_IF(INFO, item_id == 0) << "label " << datum.label();
     }
     trans_time += timer.MicroSeconds();
 

@@ -87,16 +87,6 @@ void DataReader::Body::InternalThreadEntry() {
       qps.push_back(qp);
     }
 
-    // In NFS, multiple nodes read a shared LMDB/LDB file, 
-    // need to shift input data index
-    for (int i = 0; i < Caffe::client_id(); ++i) {
-      cursor->Next();
-      if (!cursor->valid()) {
-        DLOG(INFO) << "Restarting data prefetching from start.";
-        cursor->SeekToFirst();
-      }
-    }
-
     // Main loop
     while (!must_stop()) {
       for (int i = 0; i < solver_count; ++i) {
@@ -114,27 +104,33 @@ void DataReader::Body::InternalThreadEntry() {
 }
 
 void DataReader::Body::read_one(db::Cursor* cursor, QueuePair* qp) {
+  // In NFS, multiple nodes read a shared LMDB/LDB file, 
+  // need to shift input data index according to client_id
+  static bool done_shift = false;
+  if (!done_shift) {
+    done_shift = true;
+    LOG(INFO) << "Shift " << Caffe::client_id();
+    LOG(INFO) << "client_num " << Caffe::total_client_num();
+    for (int i = 0; i < Caffe::client_id(); ++i) {
+      cursor->Next();
+      if (!cursor->valid()) {
+        LOG(INFO) << "Restarting data prefetching from start.";
+        cursor->SeekToFirst();
+      }
+    }
+  }
+
   Datum* datum = qp->free_.pop();
   // TODO deserialize in-place instead of copy?
   datum->ParseFromString(cursor->value());
   qp->full_.push(datum);
 
-  static bool called_once = false;
-  if (!called_once) {
-    called_once = true;
+  for (int i = 0; i < Caffe::total_client_num(); ++i) {
+    // go to the next iter
     cursor->Next();
     if (!cursor->valid()) {
-      DLOG(INFO) << "Restarting data prefetching from start.";
+      LOG(INFO) << "Restarting data prefetching from start.";
       cursor->SeekToFirst();
-    }
-  }else{
-    for (int i = 0; i < Caffe::total_client_num(); ++i) {
-      // go to the next iter
-      cursor->Next();
-      if (!cursor->valid()) {
-        DLOG(INFO) << "Restarting data prefetching from start.";
-        cursor->SeekToFirst();
-      }
     }
   }
 }
