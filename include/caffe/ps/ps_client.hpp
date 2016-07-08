@@ -26,9 +26,10 @@ public:
         static int id = 0;
         id_ = id++;
 
+        // TODO: key is not used here
         LOG(INFO) << "id: " << id_ << " key: " << key << "\tbytes: " << bytes;
         Comm::DataHeader *dh = header_.mutable_dh();
-        dh->set_key(key);
+        dh->set_key(id);
         dh->set_type(DataHeaderTypeWrapper<T>());
         dh->set_length(bytes);
 
@@ -129,6 +130,7 @@ protected:
         }
     }
 };
+
 
 template <typename T>
 class SVBWorker : public Worker<T>{
@@ -239,6 +241,70 @@ private:
     caffe::InnerProductLayer<T>* layer_;
     int M_, K_, N_;
     bool transpose_;  ///< if true, assume transposed weights
+};
+
+
+template <typename T>
+class WorkerGroup{
+public:
+    WorkerGroup(int key, int bytes, T* data, T* diff, string master_addr)
+    {
+        const int batch_size = 512 * 1024; // 512 KB
+	const int shift_num = batch_size / sizeof(T);
+	
+	for(int i = 0; i*batch_size < bytes; ++i){
+	    int bytes_left = bytes - i*batch_size;
+	    int my_batch_size = bytes_left < batch_size ? bytes_left : batch_size;
+	    T*  my_data = data + i*shift_num;
+	    T*  my_diff = diff + i*shift_num;
+	    
+	    worker_.push_back(shared_ptr<Worker<T> >(
+	        new Worker<T>(key, my_batch_size, my_data, my_diff, master_addr)
+	        ));
+	}
+    }
+
+    ~WorkerGroup() {}
+
+    void InitWithPS(int client_id){
+        for(auto& w : worker_)
+	    w->InitWithPS(client_id);
+    }
+
+    void Push(){
+        //for(auto& w : worker_)
+	//    w->Push();
+        vector<thread> threads;
+	for(int i = 0; i < worker_.size(); ++i)
+	    threads.push_back(thread([this, i] { worker_[i]->Push(); }));
+	for(auto& t : threads)
+	    t.join();
+    }
+
+    inline void IncIter(){
+        for(auto& w : worker_)
+	    w->IncIter();
+    }
+
+    virtual void Pull(){
+        vector<thread> threads;
+	for(int i = 0; i < worker_.size(); ++i)
+	    threads.push_back(thread([this, i] { worker_[i]->Pull(); }));
+	for(auto& t : threads)
+	    t.join();
+    }
+
+    inline int iter() { return worker_[0]->iter(); }
+    inline int num_worker() { return worker_[0]->num_worker(); }
+    inline int bytes() { return worker_[0]->bytes(); }
+
+    inline T* data() { return worker_[0]->data(); }
+    inline T* diff() { return worker_[0]->diff(); }
+
+    void Terminate() { worker_[0]->Terminate(); }
+
+protected:
+    vector<shared_ptr<Worker<T> > > worker_;
 };
 
 }

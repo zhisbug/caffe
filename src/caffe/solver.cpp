@@ -68,6 +68,9 @@ void Solver<Dtype>::Init(const SolverParameter& param) {
   auto learnable_params = net_->learnable_params();
   vector<shared_ptr<Layer<Dtype> > > layers = net_->layers();
 
+  // Wait for server
+  sleep(3);
+
   for (int l = 0; l < layers.size(); ++l) {
     vector<int> myid = layers[l]->learnable_params_id();
     for (int idx = 0; idx < myid.size(); ++idx) {
@@ -81,21 +84,22 @@ void Solver<Dtype>::Init(const SolverParameter& param) {
       syncer_[i]->gpu2ps_data();
 
       if (idx == 0 && Caffe::svb() && (string(layers[l]->type()) == "InnerProduct")){
-        LOG(INFO) << "svb at param_id " << i;
-        InnerProductLayer<Dtype>* layer = 
-            dynamic_cast<InnerProductLayer<Dtype>*>(layers[l].get());
-        CHECK(layer);
-        worker_.push_back(std::shared_ptr<ps::SVBWorker<Dtype> >
-          (new ps::SVBWorker<Dtype>(i, ps_buffer_[i]->count()*sizeof(Dtype),
-                                 ps_buffer_[i]->mutable_cpu_data(),
-                                 ps_buffer_[i]->mutable_cpu_diff(),
-                                 Caffe::master_addr(),
-                                 net_->top_vecs()[l][0], net_->bottom_vecs()[l][0],
-                                 layer)
-           ));
+        LOG(FATAL) << "Changed to WorkerGroup. Disable for now.";
+        //LOG(INFO) << "svb at param_id " << i;
+        //InnerProductLayer<Dtype>* layer = 
+        //    dynamic_cast<InnerProductLayer<Dtype>*>(layers[l].get());
+        //CHECK(layer);
+        //worker_.push_back(std::shared_ptr<ps::SVBWorker<Dtype> >
+        //  (new ps::SVBWorker<Dtype>(i, ps_buffer_[i]->count()*sizeof(Dtype),
+        //                         ps_buffer_[i]->mutable_cpu_data(),
+        //                         ps_buffer_[i]->mutable_cpu_diff(),
+        //                         Caffe::master_addr(),
+        //                         net_->top_vecs()[l][0], net_->bottom_vecs()[l][0],
+        //                         layer)
+        //   ));
       }else{
-        worker_.push_back(std::shared_ptr<ps::Worker<Dtype> >
-          (new ps::Worker<Dtype>(i, ps_buffer_[i]->count()*sizeof(Dtype),
+        worker_.push_back(std::shared_ptr<ps::WorkerGroup<Dtype> >
+          (new ps::WorkerGroup<Dtype>(i, ps_buffer_[i]->count()*sizeof(Dtype),
                                  ps_buffer_[i]->mutable_cpu_data(),
                                  ps_buffer_[i]->mutable_cpu_diff(),
                                  Caffe::master_addr())
@@ -336,11 +340,15 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
   Timer tim = Timer();
   tim.Start();
 
+  Timer tim3 = Timer();
+  tim3.Start();
   Dtype loss;
   net_->Forward(&loss);
+  tim3.Stop();
+  //LOG_IF(INFO, Caffe::root_solver()) << "DWBP forward compute: " << tim3.Seconds() << "--------------";
 
-  // LOG(INFO) << "net_->Forward(&loss)";
-  // sleep(10);
+  //LOG(INFO) << "net_->Forward(&loss)";
+  //sleep(10);
   
   float acc = 0;
   Timer tim2 = Timer();
@@ -372,15 +380,16 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
 
     // A separate thread to sync grads/params IO
     for (int i : learnable_params_id) {
-      //break;
-      //if (i > 1) break;
       if (Caffe::dwbp()) {
         if (start_sync_thread_ > 0) {
           start_sync_thread_ -= 1;
-          std::thread t = std::thread(&Solver<Dtype>::AsyncGradGPUsThread, this);
+          int device = 0;
+          CUDA_CHECK(cudaGetDevice(&device));
+          std::thread t = std::thread(&Solver<Dtype>::AsyncGradGPUsThread, this, device);
           t.detach();
         }
         queue_.push(i);
+
         //threads.push_back(std::thread(&Solver<Dtype>::AsyncGradGPUs, this, i));
       }else{
         AsyncGradGPUs(i);
@@ -388,25 +397,30 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
       }
     }
   }
-  
-  std::unique_lock<std::mutex> lk(m_);
-  while(sync_count_ != net_->learnable_params().size())
-    cond_.wait(lk);
-  sync_count_ = 0;
+
+  //LOG_IF(INFO, Caffe::root_solver()) << "DWBP backward compute: " 
+  //  << acc << " at " << sync_count_ << "--------------";
+
+  if (Caffe::dwbp()) {
+    std::unique_lock<std::mutex> lk(m_);
+    while(sync_count_ != net_->learnable_params().size())
+      cond_.wait(lk);
+    sync_count_ = 0;
+  }
 
   for (int i = 0; i < threads.size(); ++i)
     threads[i].join();
-  tim.Stop();
-  // if (Caffe::root_solver()) 
-  //   LOG(INFO) << "DWBP: " << tim.Seconds() << "--------------";
 
-  static int mycount = 0;
-  mycount++;
-  if (mycount > 4000) {
-    if (Caffe::client_id() == 0)
-      worker_[0]->Terminate();
-    LOG(FATAL) << "-----------------------";
-  }
+  tim.Stop();
+  //LOG_IF(INFO, Caffe::root_solver()) << "DWBP: " << tim.Seconds() << "--------------";
+
+  //static int mycount = 0;
+  //mycount++;
+  //if (mycount > 1001) {
+  //  if (Caffe::client_id() == 0)
+  //    worker_[0]->Terminate();
+  //  LOG(FATAL) << "-----------------------";
+  //}
 
   return loss;
 }
@@ -434,10 +448,44 @@ Dtype mydiff(int N, Dtype* X, Dtype* Y) {
 }
 
 template <typename Dtype>
-void Solver<Dtype>::AsyncGradGPUsThread() {
+void Solver<Dtype>::AsyncGradGPUsThread(int device) {
+  CUDA_CHECK(cudaSetDevice(device));
+  cudaStream_t stream;
+  CUDA_CHECK(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking));
+
   while(true){
     int id = queue_.wait_and_pop();
-    AsyncGradGPUs(id);
+    Timer tim = Timer();
+    tim.Start();
+    //LOG_IF(INFO, id == 10) << "id " << id << " Starts";
+
+    Timer tim2 = Timer();
+    tim2.Start();
+    // diff: GPU -> CPU
+    syncer_[id]->gpu2ps_diff(stream);
+    CUDA_CHECK(cudaStreamSynchronize(stream));
+    tim2.Stop();
+    //LOG_IF(INFO, id == 10) << "id " << id << " GPU->CPU takes " << tim2.Seconds();
+
+    tim2.Start();
+    // CPU -> PS -> CPU
+    //LOG_IF(INFO, id == 10) << "Send " << id;
+    worker_[id]->Push();
+    worker_[id]->IncIter();
+    worker_[id]->Pull();
+    //LOG_IF(INFO, id == 10) << "Received " << id;
+    tim2.Stop();
+    //LOG_IF(INFO, id == 10) << "id " << id << " CPU<->PS takes " << tim2.Seconds();
+
+    tim2.Start();
+    // CPU -> GPU
+    syncer_[id]->ps2gpu_data(stream);
+    CUDA_CHECK(cudaStreamSynchronize(stream));
+    tim2.Stop();
+    //LOG_IF(INFO, id == 10) << "id " << id << " CPU->GPU takes " << tim2.Seconds();
+    
+    tim.Stop();
+    //LOG(INFO) << "id " << id << " takes " << tim.Seconds();
     
     std::lock_guard<std::mutex> lk(m_);
     sync_count_++;
@@ -455,18 +503,17 @@ void Solver<Dtype>::AsyncGradGPUs(int id) {
   Timer tim = Timer();
   tim.Start();
 
-  Dtype* data = syncer_[id]->ps_cpu_data();
-  Dtype* diff = syncer_[id]->ps_cpu_diff();
-
   // diff: GPU -> CPU
   syncer_[id]->gpu2ps_diff();
 
+  //Dtype* data = syncer_[id]->ps_cpu_data();
+  //Dtype* diff = syncer_[id]->ps_cpu_diff();
   //LOG_IF(INFO, (id==0)) 
   //  << data[0] << " " << data[1] << " " << data[2];
   //LOG_IF(INFO, (id==0)) 
   //  << diff[0] << " " << diff[1] << " " << diff[2];
   
-  //// Push diff to PS
+  // CPU -> PS -> CPU
   worker_[id]->Push();
   worker_[id]->IncIter();
   worker_[id]->Pull();

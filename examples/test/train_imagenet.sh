@@ -25,8 +25,12 @@ host_file=$(readlink -f $host_filename)
 #dataset=alexnet
 #solver_filename="${app_dir}/examples/test/solver.prototxt"
 
-dataset=googlenet
-solver_filename="${app_dir}/examples/test_googlenet/quick_solver.prototxt"
+dataset=alexnet_local
+solver_prefix="${app_dir}/examples/alexnet_local/solver"
+solver_postfix=".prototxt"
+
+#dataset=googlenet
+#solver_filename="${app_dir}/examples/test_googlenet/quick_solver.prototxt"
 #solver_prefix="${app_dir}/examples/test_googlenet/quick_solver"
 #solver_postfix=".prototxt"
 
@@ -86,7 +90,9 @@ caffe_cmd0=""
 for ip in $unique_host_list; do
   echo Running client $client_id on $ip
   log_path=${log_dir}.${client_id}
-  #solver_filename=${solver_prefix}${client_id}${solver_postfix}
+
+  # used for googlenet only
+  solver_filename=${solver_prefix}${client_id}${solver_postfix}
 
   cmd_prefix="'mkdir -p ${output_dir}; \
       mkdir -p ${log_path}; \
@@ -100,7 +106,8 @@ for ip in $unique_host_list; do
       GLOG_vmodule=""" # \
 
   server_cmd="$cmd_prefix \
-      $serv_path tcp://${ip}:6666 ${mast_addr}'"
+      $serv_path tcp://${ip}:6666 ${mast_addr} \
+      2> ${log_dir}_server_${client_id}'"
 
   caffe_cmd="$cmd_prefix \
       $prog_path train \
@@ -111,8 +118,8 @@ for ip in $unique_host_list; do
       --svb=$svb \
       --dwbp=$dwbp \
       --net_outputs=${net_outputs_prefix} \
-      --gpu=${devices}'" #\
-      #--gpu=${devices} 2> ${log_dir}${client_id}'" #\
+      --gpu=${devices} 2> ${log_dir}${client_id}'" #\
+      #--gpu=${devices}'" #\
       #--gpu=${devices} 2> ${log_dir}${client_id}'" #\
       #--snapshot=${snapshot_filename}'"
   

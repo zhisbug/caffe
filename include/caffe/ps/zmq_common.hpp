@@ -74,7 +74,7 @@ private:
 class ZMQContext{
 public:
     static zmq::context_t& Get(){
-        static zmq::context_t ctx(1);
+        static zmq::context_t ctx(16);
         return ctx;
     }
 };

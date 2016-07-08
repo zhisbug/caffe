@@ -75,6 +75,8 @@ public:
                     }else{
                         CHECK(header->dh().iter() == kv_iter_[k]);
                         CHECK(num_workers_[k] = to_workers_[k].size());
+
+                        //LOG_IF(INFO, k == 10) << "Received " << k;
                         
                         kv_count_[k]++;
 
@@ -87,9 +89,15 @@ public:
                                 kv_iter_[k]++;
                             }
                         }else{
+                            caffe::Timer tim = caffe::Timer();
+			    tim.Start();
                             accumulate_wrapper(header.get(), buf.get());
+			    tim.Stop();
+                            //LOG_IF(INFO, k == 10) << "accumulate "
+			    //  << k << " takes " << tim.Seconds();
 
                             if(kv_count_[k] == num_workers_[k]){
+			        //LOG_IF(INFO, k == 10) << "Send " << k;
                                 kv_count_[k] = 0;
                                 kv_iter_[k]++;
                                 header->mutable_dh()->set_iter(kv_iter_[k]);

@@ -2,7 +2,6 @@
 #include "caffe/ps/ps_server.hpp"
 #include "caffe/ps/zmq_common.hpp"
 
-
 using namespace ps;
 
 int main(int argc, char **argv){

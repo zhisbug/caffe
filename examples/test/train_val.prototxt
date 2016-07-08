@@ -13,7 +13,7 @@ layer {
   }
   data_param {
     source: "/tank/projects/biglearning/hao/data/ilsvrc/ilsvrc12_train_lmdb"
-    batch_size: 64
+    batch_size: 256
     backend: LMDB
   }
 }

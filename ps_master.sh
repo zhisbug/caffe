@@ -1,1 +1,1 @@
-./build/tools/ps_master tcp://127.0.0.1:5555 1
+./build/tools/ps_master tcp://10.54.1.13:5555 1

@@ -62,6 +62,20 @@ public:
                    ps_buffer_->mutable_cpu_diff(), 
                    size_, cudaMemcpyDeviceToHost);
     }
+
+    void gpu2ps_diff(const cudaStream_t& stream){
+        cudaMemcpyAsync(ps_buffer_->mutable_cpu_diff(),
+                   gpu_param_->mutable_gpu_diff(), 
+                   size_, cudaMemcpyHostToDevice,
+                   stream);
+    }
+    void ps2gpu_data(const cudaStream_t& stream){
+        cudaMemcpyAsync(gpu_param_->mutable_gpu_data(),
+                   ps_buffer_->mutable_cpu_data(), 
+                   size_, cudaMemcpyHostToDevice,
+                   stream);
+    }
+
     Dtype* ps_cpu_diff(){
         return ps_buffer_->mutable_cpu_diff();
     }
@@ -144,7 +158,7 @@ class Solver {
   //dwbp
   Dtype ForwardBackwardWithDWBP();
   void AsyncGradGPUs(int learnable_params_id);
-  void AsyncGradGPUsThread();
+  void AsyncGradGPUsThread(int device);
 
  protected:
   // Make and apply the update value for the current iteration.
@@ -184,7 +198,7 @@ class Solver {
 
   // PS -------------------
   vector<std::shared_ptr<Blob<Dtype> > > ps_buffer_; // one-to-one with learnable_params
-  vector<std::shared_ptr<ps::Worker<Dtype> > > worker_;
+  vector<std::shared_ptr<ps::WorkerGroup<Dtype> > > worker_;
   vector<std::shared_ptr<MySyncer<Dtype> > > syncer_;
   
   ps::ThreadSafeQueue<int> queue_;
