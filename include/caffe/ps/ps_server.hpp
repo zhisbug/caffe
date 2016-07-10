@@ -26,6 +26,10 @@ public:
         ctrl4master->set_op(Comm::CtrlHeader::ADD);
         ctrl4master->add_addr(my_addr_);
         to_master_->Send(header4master);
+        to_master_->Recv(&header4master);
+        CHECK(ctrl4master->has_num_client());
+        num_client_ = ctrl4master->num_client();
+        LOG(INFO) << "Expect " << num_client_ << " clients";
         LOG(INFO) << "Master connected...";
 
         LOG(INFO) << "Launching producer and consumer...";
@@ -47,10 +51,21 @@ public:
                             if(is_init_.find(k) == is_init_.end())
                                 is_init_[k] = false;
                             continue;
+                        }else if(header->ch().op() == Comm::CtrlHeader::ASK_INIT){
+                            int k = header->ch().key();
+			    if(to_workers_[k].size() == num_client_){
+			        header->mutable_ch()->set_op(Comm::CtrlHeader::GO);
+			    }else if(to_workers_[k].size() < num_client_){
+			        header->mutable_ch()->set_op(Comm::CtrlHeader::WAIT);
+			    }else{
+			        LOG(FATAL) << "Too many clients.";
+                            }
+			    server_->Send(id, *header);
+                            continue;
                         }else if(header->ch().op() == Comm::CtrlHeader::TERMINATE){
                             LOG(INFO) << "Consumer Terminating...";
                             break; 
-                        }else{
+			}else{
                             LOG(FATAL) << "Not recognized.";
                         }
                     }
@@ -74,7 +89,7 @@ public:
                         }
                     }else{
                         CHECK(header->dh().iter() == kv_iter_[k]);
-                        CHECK(num_workers_[k] = to_workers_[k].size());
+                        CHECK(num_workers_[k] == to_workers_[k].size());
 
                         //LOG_IF(INFO, k == 10) << "Received " << k;
                         
@@ -148,6 +163,7 @@ private:
     std::string my_addr_, master_addr_;
     std::shared_ptr<ZMQServer> server_;
     std::shared_ptr<ZMQClient> to_master_;
+    int num_client_;
 
     std::unordered_map<int, std::vector<std::string> > to_workers_;
     std::unordered_map<int, int> num_workers_; // number of ACTIVE workers

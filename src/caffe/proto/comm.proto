@@ -3,11 +3,14 @@ package Comm;
 message CtrlHeader{
     enum RoleType{SERVER = 1; WORKER = 2;}
     required RoleType role = 1;
-    enum Operation{ADD = 1; TERMINATE = 2; QUERY_SERVER = 3; QUERY_WORKERS = 4;}
+    enum Operation{ADD = 1; TERMINATE = 2;
+                   QUERY_SERVER = 3; QUERY_WORKERS = 4;
+		   ASK_INIT = 5; WAIT = 6; GO = 7; }
     required Operation op = 2;
     repeated string addr = 3;
     optional int32 key = 4;
     optional string id = 5;
+    optional int32 num_client = 6;
 }
 
 message DataHeader{

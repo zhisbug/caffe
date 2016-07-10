@@ -29,12 +29,30 @@ public:
         // TODO: key is not used here
         LOG(INFO) << "id: " << id_ << " key: " << key << "\tbytes: " << bytes;
         Comm::DataHeader *dh = header_.mutable_dh();
-        dh->set_key(id);
+        dh->set_key(id_);
         dh->set_type(DataHeaderTypeWrapper<T>());
         dh->set_length(bytes);
 
-        // LOG(INFO) << "Register at master " << master_addr;
         to_master_.reset(new ZMQClient(master_addr));
+
+        // wait for all servers to register
+        while(true){
+            Comm::Header h;
+            h.mutable_ch()->set_role(Comm::CtrlHeader::WORKER);
+            h.mutable_ch()->set_op(Comm::CtrlHeader::ASK_INIT);
+            to_master_->Send(h);
+	    to_master_->Recv(&h);
+	    if(h.ch().op() == Comm::CtrlHeader::GO){
+	        break;
+	    }else if(h.ch().op() == Comm::CtrlHeader::WAIT){
+	        LOG(INFO) << id_ << " waiting for all servers to register...";
+	        sleep(1);
+	    }else{
+	        LOG(FATAL) << "Op not recognized.";
+	    }
+        }
+
+        LOG(INFO) << "Register at master " << master_addr;
         Comm::Header header4master;
         Comm::CtrlHeader *ctrl4master = header4master.mutable_ch();
         ctrl4master->set_role(Comm::CtrlHeader::WORKER);
@@ -62,6 +80,25 @@ public:
         Comm::DataHeader *dh = header_.mutable_dh();
 
         if(client_id == 0){
+            // check if all clients have registered
+            while(true){
+                Comm::Header h;
+                h.mutable_ch()->set_key(id_);
+                h.mutable_ch()->set_role(Comm::CtrlHeader::WORKER);
+                h.mutable_ch()->set_op(Comm::CtrlHeader::ASK_INIT);
+                client_->Send(h);
+		client_->Recv(&h);
+		if(h.ch().op() == Comm::CtrlHeader::GO){
+		    LOG(INFO) << "GO";
+		    break;
+		}else if(h.ch().op() == Comm::CtrlHeader::WAIT){
+		    LOG(INFO) << id_ << " waiting for all clients to register...";
+		    sleep(1);
+		}else{
+		    LOG(FATAL) << "Op not recognized.";
+		}
+            }
+            
             dh->set_iter(0);
             dh->set_is_init(true);
             client_->Send(header_, data_);

@@ -12,8 +12,10 @@ public:
         my_addr_(my_addr), servers_(0){
         LOG(INFO) << "Master Addr: \"" << my_addr << "\"";
         LOG(INFO) << "Expected Servers: " << expected_servers;
+        int expected_clients = expected_servers;
+        LOG(INFO) << "Expected Clients: " << expected_servers;
         master_ = std::shared_ptr<ZMQServer>(new ZMQServer(my_addr_));
-        dealer_ = std::shared_ptr<std::thread>(new std::thread([this, expected_servers]
+        dealer_ = std::shared_ptr<std::thread>(new std::thread([this, expected_servers, expected_clients]
             {
                 while(1){
                     Comm::Header request;
@@ -32,16 +34,34 @@ public:
                                 LOG(INFO) << "Server[" << servers_ << "]("
                                                << ch->addr(0) 
                                                << ") registered successfully";
-                                if (++servers_ == expected_servers){
+			        Comm::Header reply;
+				reply.mutable_ch()->set_role(Comm::CtrlHeader::SERVER);
+				reply.mutable_ch()->set_op(Comm::CtrlHeader::ADD);
+				reply.mutable_ch()->set_num_client(expected_clients);
+			        master_->Send(id, reply);
+				servers_++;
+                                if (servers_ == expected_servers){
                                     LOG(INFO) << "All expected servers registered";
-                                }
+                                }else if (servers_ > expected_servers){
+				    LOG(FATAL) << "Too many servers";
+				}
                             }else{
-                                LOG(INFO) << "Existing server(" << ch->addr(0) 
+                                LOG(FATAL) << "Existing server(" << ch->addr(0) 
                                           << ") already registered";
                             }
                         }
                     }else{//worker
-                        if (ch->op() == Comm::CtrlHeader::QUERY_SERVER){
+                        if(ch->op() == Comm::CtrlHeader::ASK_INIT){
+                            Comm::Header reply;
+			    reply.mutable_ch()->set_role(Comm::CtrlHeader::WORKER);
+			    if(servers_ == expected_servers)
+			        reply.mutable_ch()->set_op(Comm::CtrlHeader::GO);
+			    else if(servers_ < expected_servers)
+			        reply.mutable_ch()->set_op(Comm::CtrlHeader::WAIT);
+			    else
+			        LOG(FATAL) << "Too many servers.";
+                            master_->Send(id, reply);
+                        }else if (ch->op() == Comm::CtrlHeader::QUERY_SERVER){
                             //for worker to server communication
                             CHECK(ch->has_key());
                             LOG(INFO) << id << " Sender Query the Addr of Server for Key " << ch->key();
