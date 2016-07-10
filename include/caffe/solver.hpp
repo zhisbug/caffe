@@ -55,18 +55,18 @@ public:
     void gpu2ps_diff(){
         cudaMemcpy(ps_buffer_->mutable_cpu_diff(),
                    gpu_param_->mutable_gpu_diff(), 
-                   size_, cudaMemcpyHostToDevice);
+                   size_, cudaMemcpyDeviceToHost);
     }
     void ps2gpu_diff(){
         cudaMemcpy(gpu_param_->mutable_gpu_diff(),
                    ps_buffer_->mutable_cpu_diff(), 
-                   size_, cudaMemcpyDeviceToHost);
+                   size_, cudaMemcpyHostToDevice);
     }
 
     void gpu2ps_diff(const cudaStream_t& stream){
         cudaMemcpyAsync(ps_buffer_->mutable_cpu_diff(),
                    gpu_param_->mutable_gpu_diff(), 
-                   size_, cudaMemcpyHostToDevice,
+                   size_, cudaMemcpyDeviceToHost,
                    stream);
     }
     void ps2gpu_data(const cudaStream_t& stream){

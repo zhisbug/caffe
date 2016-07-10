@@ -352,7 +352,7 @@ Dtype Solver<Dtype>::ForwardBackwardWithDWBP() {
     // Do computation at main stream: diff = -diff * lr
     // It appears that streams switch on GPU has large overhead
     ApplyUpdateParams(learnable_params_id);
-
+    CUDA_CHECK(cudaStreamSynchronize(cudaStreamDefault));
     // A separate thread to sync grads/params IO
     for (int i : learnable_params_id) {
       if (Caffe::dwbp()) {
