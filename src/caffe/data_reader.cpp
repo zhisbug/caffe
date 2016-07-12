@@ -75,22 +75,26 @@ void DataReader::Body::InternalThreadEntry() {
   db->Open(param_.data_param().source(), db::READ);
   shared_ptr<db::Cursor> cursor(db->NewCursor());
   vector<shared_ptr<QueuePair> > qps;
+  static int reader_count = 0;
+  reader_count++;
+  LOG_IF(FATAL, reader_count > 3) << "More than 2 reader!";
   try {
     int solver_count = param_.phase() == TRAIN ? Caffe::solver_count() : 1;
+    bool done_shift = false;
 
     // To ensure deterministic runs, only start running once all solvers
     // are ready. But solvers need to peek on one item during initialization,
     // so read one item, then wait for the next solver.
     for (int i = 0; i < solver_count; ++i) {
       shared_ptr<QueuePair> qp(new_queue_pairs_.pop());
-      read_one(cursor.get(), qp.get());
+      read_one(cursor.get(), qp.get(), &done_shift);
       qps.push_back(qp);
     }
 
     // Main loop
     while (!must_stop()) {
       for (int i = 0; i < solver_count; ++i) {
-        read_one(cursor.get(), qps[i].get());
+        read_one(cursor.get(), qps[i].get(), &done_shift);
       }
       // Check no additional readers have been created. This can happen if
       // more than one net is trained at a time per process, whether single
@@ -103,13 +107,12 @@ void DataReader::Body::InternalThreadEntry() {
   }
 }
 
-void DataReader::Body::read_one(db::Cursor* cursor, QueuePair* qp) {
+void DataReader::Body::read_one(db::Cursor* cursor, QueuePair* qp, bool* done_shift) {
   // In NFS, multiple nodes read a shared LMDB/LDB file, 
   // need to shift input data index according to client_id
-  static bool done_shift = false;
   if (Caffe::share_db()) { 
-    if (!done_shift) {
-      done_shift = true;
+    if (!*done_shift) {
+      *done_shift = true;
       LOG(INFO) << "Shift " << Caffe::client_id();
       LOG(INFO) << "client_num " << Caffe::total_client_num();
       for (int i = 0; i < Caffe::client_id(); ++i) {

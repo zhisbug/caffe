@@ -155,7 +155,10 @@ class Solver {
    */
   virtual inline const char* type() const { return ""; }
 
-  //dwbp
+  // ps
+  void AverageLossOverWorkers(Dtype* mean_score);
+
+  // dwbp
   Dtype ForwardBackwardWithDWBP();
   void AsyncGradGPUs(int learnable_params_id);
   void AsyncGradGPUsThread(int device);
@@ -200,6 +203,9 @@ class Solver {
   vector<std::shared_ptr<Blob<Dtype> > > ps_buffer_; // one-to-one with learnable_params
   vector<std::shared_ptr<ps::WorkerGroup<Dtype> > > worker_;
   vector<std::shared_ptr<MySyncer<Dtype> > > syncer_;
+
+  std::shared_ptr<ps::Worker<Dtype> > loss_worker_;
+  Dtype loss_buffer_ = 0;
   
   ps::ThreadSafeQueue<int> queue_;
   int start_sync_thread_ = 4;

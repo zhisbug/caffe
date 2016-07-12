@@ -111,6 +111,20 @@ void Solver<Dtype>::Init(const SolverParameter& param) {
     syncer_[i]->ps2gpu_data();
   }
 
+  loss_worker_.reset(new ps::Worker<Dtype>(-1, 1*sizeof(Dtype),
+                           &loss_buffer_, &loss_buffer_,
+                           Caffe::master_addr()));
+  loss_worker_->InitWithPS(Caffe::client_id());
+}
+
+template <typename Dtype>
+void Solver<Dtype>::AverageLossOverWorkers(Dtype* mean_score) {
+  loss_buffer_ = *mean_score;
+  loss_worker_->Push();
+  loss_worker_->IncIter();
+  loss_worker_->Pull();
+  *mean_score = loss_buffer_ / Caffe::total_client_num();
+  loss_worker_->Reset(Caffe::client_id());
 }
 
 template <typename Dtype>
@@ -591,11 +605,17 @@ void Solver<Dtype>::Test(const int test_net_id) {
     const string& output_name = test_net->blob_names()[output_blob_index];
     const Dtype loss_weight = test_net->blob_loss_weights()[output_blob_index];
     ostringstream loss_msg_stream;
-    const Dtype mean_score = test_score[i] / param_.test_iter(test_net_id);
+    Dtype mean_score = test_score[i] / param_.test_iter(test_net_id);
+
     if (loss_weight) {
       loss_msg_stream << " (* " << loss_weight
                       << " = " << loss_weight * mean_score << " loss)";
     }
+    LOG(INFO) << "    Test net output #" << i << ": " << output_name << " = "
+              << mean_score << loss_msg_stream.str();
+
+    AverageLossOverWorkers(&mean_score);
+
     LOG(INFO) << "    Test net output #" << i << ": " << output_name << " = "
               << mean_score << loss_msg_stream.str();
   }

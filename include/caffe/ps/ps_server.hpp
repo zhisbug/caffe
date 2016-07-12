@@ -62,6 +62,14 @@ public:
                             }
 			    server_->Send(id, *header);
                             continue;
+                        }else if(header->ch().op() == Comm::CtrlHeader::RESET){
+                            int k = header->ch().key();
+			    int length = kv_length_[k];
+			    memset(kv_pair_[k].get(), 0, length);
+                            for(auto& id : to_workers_[k]){
+			        server_->Send(id, *header);
+                            }
+			    continue;
                         }else if(header->ch().op() == Comm::CtrlHeader::TERMINATE){
                             LOG(INFO) << "Consumer Terminating...";
                             break; 
@@ -79,6 +87,7 @@ public:
                         LOG(INFO) << "Initing id " << k;
                         is_init_[k] = true;
                         kv_iter_[k] = header->dh().iter();
+                        kv_length_[k] = header->dh().length();
 
                         accumulate_wrapper(header.get(), buf.get());
 
@@ -172,6 +181,7 @@ private:
     std::unordered_map<int, std::shared_ptr<char> > kv_pair_;
     std::unordered_map<int, int> kv_count_;
     std::unordered_map<int, int> kv_iter_;
+    std::unordered_map<int, int> kv_length_;
 
     ThreadSafeQueue<MD_PAIR> queue_;
     std::shared_ptr<std::thread> producer_;

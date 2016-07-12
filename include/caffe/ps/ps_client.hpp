@@ -128,6 +128,18 @@ public:
         client_->Recv(&h, (void**)&data_);
         CHECK(h.dh().iter() == header_.dh().iter());
     }
+    
+    void Reset(int client_id){
+        if(client_id == 0){
+            Comm::Header h;
+            h.mutable_ch()->set_key(id_);
+            h.mutable_ch()->set_role(Comm::CtrlHeader::WORKER);
+            h.mutable_ch()->set_op(Comm::CtrlHeader::RESET);
+            client_->Send(h);
+	}
+        Comm::Header h;
+        client_->Recv(&h);
+    }
 
     inline int iter() { return header_.dh().iter(); }
     inline int num_worker() { return header_.dh().num_worker(); }

@@ -53,7 +53,7 @@ class DataReader {
 
    protected:
     void InternalThreadEntry();
-    void read_one(db::Cursor* cursor, QueuePair* qp);
+    void read_one(db::Cursor* cursor, QueuePair* qp, bool* read_one);
 
     const LayerParameter param_;
     BlockingQueue<shared_ptr<QueuePair> > new_queue_pairs_;
