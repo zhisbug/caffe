@@ -59,6 +59,8 @@ DEFINE_string(recv_addr, "tcp://127.0.0.1:5554",
              "ps master address");
 DEFINE_string(master_addr, "tcp://127.0.0.1:5555",
              "ps master address");
+DEFINE_bool(share_db, false, "is the dababase shared?");
+
 
 // A simple registry for caffe commands.
 typedef int (*BrewFunction)();
@@ -220,6 +222,7 @@ int train() {
   Caffe::set_dwbp(FLAGS_dwbp);
   Caffe::set_recv_addr(FLAGS_recv_addr);
   Caffe::set_master_addr(FLAGS_master_addr);
+  Caffe::set_share_db(FLAGS_share_db);
 
   shared_ptr<caffe::Solver<float> >
       solver(caffe::SolverRegistry<float>::CreateSolver(solver_param));

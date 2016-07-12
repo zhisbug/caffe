@@ -186,6 +186,9 @@ class Caffe {
   inline static string master_addr() { return Get().master_addr_; }
   inline static void set_master_addr(string s) { Get().master_addr_ = s; }
 
+  inline static bool share_db() { return Get().share_db_; }
+  inline static void set_share_db(bool val) { Get().share_db_ = val; }
+  
  protected:
 #ifndef CPU_ONLY
   cublasHandle_t cublas_handle_;
@@ -205,6 +208,7 @@ class Caffe {
   bool dwbp_;
   string recv_addr_;
   string master_addr_;
+  bool share_db_;
 
 
  private:
