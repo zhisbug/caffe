@@ -29,13 +29,13 @@ host_file=$(readlink -f $host_filename)
 #solver_prefix="${app_dir}/examples/alexnet_local/solver"
 #solver_postfix=".prototxt"
 
-#dataset=googlenet
+dataset=googlenet
 #solver_filename="${app_dir}/examples/test_googlenet/quick_solver.prototxt"
-#solver_prefix="${app_dir}/examples/test_googlenet/quick_solver"
-#solver_postfix=".prototxt"
+solver_prefix="${app_dir}/examples/test_googlenet/quick_solver"
+solver_postfix=".prototxt"
 
-dataset=cifar10
-solver_filename="${app_dir}/examples/test_cifar10/cifar10_quick_solver.prototxt"
+#dataset=cifar10
+#solver_filename="${app_dir}/examples/test_cifar10/cifar10_quick_solver.prototxt"
 
  # Uncomment this and line-93 if (re-)start training from a snapshot
 #snapshot_filename="${app_dir}/(SOLVERSTATE_FILE)"
@@ -79,6 +79,8 @@ echo "All done!"
 
 sleep 3
 
+#exit 0
+
 # ------------- Start Program ------------- #
 
 host_array=($unique_host_list)
@@ -92,7 +94,7 @@ for ip in $unique_host_list; do
   log_path=${log_dir}.${client_id}
 
   # used for googlenet only
-  #solver_filename=${solver_prefix}${client_id}${solver_postfix}
+  solver_filename=${solver_prefix}${client_id}${solver_postfix}
 
   cmd_prefix="'mkdir -p ${output_dir}; \
       mkdir -p ${log_path}; \
@@ -114,7 +116,7 @@ for ip in $unique_host_list; do
       --master_addr ${mast_addr}
       --client_id ${client_id} \
       --total_client_num ${#host_array[@]} \
-      --share_db=true \
+      --share_db=false \
       --solver=${solver_filename} \
       --svb=$svb \
       --dwbp=$dwbp \

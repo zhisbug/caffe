@@ -68,10 +68,12 @@ void Solver<Dtype>::Init(const SolverParameter& param) {
   auto learnable_params = net_->learnable_params();
   vector<shared_ptr<Layer<Dtype> > > layers = net_->layers();
 
+  int true_index = 0;
   for (int l = 0; l < layers.size(); ++l) {
     vector<int> myid = layers[l]->learnable_params_id();
     for (int idx = 0; idx < myid.size(); ++idx) {
       int i = myid[idx];
+      CHECK(i == true_index++);
       //if (i > 1) break;
       ps_buffer_.push_back(std::shared_ptr<Blob<Dtype> >
         (new Blob<Dtype>(learnable_params[i]->shape())));

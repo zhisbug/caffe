@@ -299,6 +299,7 @@ public:
     WorkerGroup(int key, int bytes, T* data, T* diff, string master_addr)
     {
         const int batch_size = 512 * 1024; // 512 KB
+        //const int batch_size = 32 * 1024; // 32 KB
 	const int shift_num = batch_size / sizeof(T);
 	
 	for(int i = 0; i*batch_size < bytes; ++i){
