@@ -37,54 +37,49 @@ typedef boost::function<SolverAction::Enum()> ActionCallback;
 template <typename Dtype>
 class MySyncer {
 public:
-    MySyncer(Blob<Dtype>* ps_buffer, Blob<Dtype>* gpu_param) :
-      ps_buffer_(ps_buffer), gpu_param_(gpu_param) {
-        CHECK(ps_buffer_->count() == gpu_param_->count());
-        size_ = ps_buffer_->count()*sizeof(Dtype);
-    }
+    MySyncer(void* cpu_data, void* cpu_diff,
+             void* gpu_data, void* gpu_diff, size_t bytes) :
+      cpu_data_(cpu_data), cpu_diff_(cpu_diff),
+      gpu_data_(gpu_data), gpu_diff_(gpu_diff), size_(bytes) {}
     void gpu2ps_data(){
-        cudaMemcpy(ps_buffer_->mutable_cpu_data(),
-                   gpu_param_->mutable_gpu_data(), 
+        cudaMemcpy(cpu_data_, gpu_data_,
                    size_, cudaMemcpyDeviceToHost);
     }
     void ps2gpu_data(){
-        cudaMemcpy(gpu_param_->mutable_gpu_data(),
-                   ps_buffer_->mutable_cpu_data(), 
+        cudaMemcpy(gpu_data_, cpu_data_,
                    size_, cudaMemcpyHostToDevice);
     }
     void gpu2ps_diff(){
-        cudaMemcpy(ps_buffer_->mutable_cpu_diff(),
-                   gpu_param_->mutable_gpu_diff(), 
+        cudaMemcpy(cpu_diff_, gpu_diff_,
                    size_, cudaMemcpyDeviceToHost);
     }
     void ps2gpu_diff(){
-        cudaMemcpy(gpu_param_->mutable_gpu_diff(),
-                   ps_buffer_->mutable_cpu_diff(), 
+        cudaMemcpy(gpu_diff_, cpu_diff_,
                    size_, cudaMemcpyHostToDevice);
     }
 
     void gpu2ps_diff(const cudaStream_t& stream){
-        cudaMemcpyAsync(ps_buffer_->mutable_cpu_diff(),
-                   gpu_param_->mutable_gpu_diff(), 
-                   size_, cudaMemcpyDeviceToHost,
-                   stream);
+        cudaMemcpyAsync(cpu_diff_, gpu_diff_,
+                        size_, cudaMemcpyDeviceToHost,
+                        stream);
     }
     void ps2gpu_data(const cudaStream_t& stream){
-        cudaMemcpyAsync(gpu_param_->mutable_gpu_data(),
-                   ps_buffer_->mutable_cpu_data(), 
-                   size_, cudaMemcpyHostToDevice,
-                   stream);
+        cudaMemcpyAsync(gpu_data_, cpu_data_,
+                        size_, cudaMemcpyHostToDevice,
+                        stream);
     }
 
     Dtype* ps_cpu_diff(){
-        return ps_buffer_->mutable_cpu_diff();
+        return (Dtype*)cpu_diff_;
     }
     Dtype* ps_cpu_data(){
-        return ps_buffer_->mutable_cpu_data();
+        return (Dtype*)cpu_data_;
     }
 private:
-    Blob<Dtype>* ps_buffer_;
-    Blob<Dtype>* gpu_param_;
+    void* cpu_data_;
+    void* cpu_diff_;
+    void* gpu_data_;
+    void* gpu_diff_;
     size_t size_;
 };
 
@@ -200,7 +195,9 @@ class Solver {
   bool requested_early_exit_;
 
   // PS -------------------
-  vector<std::shared_ptr<Blob<Dtype> > > ps_buffer_; // one-to-one with learnable_params
+  //vector<std::shared_ptr<Blob<Dtype> > > ps_buffer_; // one-to-one with learnable_params
+  vector<std::shared_ptr<char > > ps_data_; // one-to-one with learnable_params
+  vector<std::shared_ptr<char > > ps_diff_; // one-to-one with learnable_params
   vector<std::shared_ptr<ps::WorkerGroup<Dtype> > > worker_;
   vector<std::shared_ptr<MySyncer<Dtype> > > syncer_;
 

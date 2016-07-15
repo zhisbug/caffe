@@ -30,9 +30,9 @@ host_file=$(readlink -f $host_filename)
 #solver_postfix=".prototxt"
 
 dataset=googlenet
-#solver_filename="${app_dir}/examples/test_googlenet/quick_solver.prototxt"
-solver_prefix="${app_dir}/examples/test_googlenet/quick_solver"
-solver_postfix=".prototxt"
+solver_filename="${app_dir}/examples/test_googlenet/quick_solver.prototxt"
+#solver_prefix="${app_dir}/examples/test_googlenet/quick_solver"
+#solver_postfix=".prototxt"
 
 #dataset=cifar10
 #solver_filename="${app_dir}/examples/test_cifar10/cifar10_quick_solver.prototxt"
@@ -94,7 +94,7 @@ for ip in $unique_host_list; do
   log_path=${log_dir}.${client_id}
 
   # used for googlenet only
-  solver_filename=${solver_prefix}${client_id}${solver_postfix}
+  #solver_filename=${solver_prefix}${client_id}${solver_postfix}
 
   cmd_prefix="'mkdir -p ${output_dir}; \
       mkdir -p ${log_path}; \

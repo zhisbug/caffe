@@ -75,10 +75,17 @@ void Solver<Dtype>::Init(const SolverParameter& param) {
       int i = myid[idx];
       CHECK(i == true_index++);
       //if (i > 1) break;
-      ps_buffer_.push_back(std::shared_ptr<Blob<Dtype> >
-        (new Blob<Dtype>(learnable_params[i]->shape())));
+      ps_data_.push_back(std::shared_ptr<char>
+        (new char[learnable_params[i]->count()*sizeof(Dtype)]));
+      ps_diff_.push_back(std::shared_ptr<char>
+        (new char[learnable_params[i]->count()*sizeof(Dtype)]));
+
       syncer_.push_back(std::shared_ptr<MySyncer<Dtype> >
-        (new MySyncer<Dtype>(ps_buffer_[i].get(), learnable_params[i])));
+        (new MySyncer<Dtype>(ps_data_[i].get(), ps_diff_[i].get(),
+           learnable_params[i]->mutable_gpu_data(),
+           learnable_params[i]->mutable_gpu_diff(),
+           learnable_params[i]->count() * sizeof(Dtype)
+        )));
 
       syncer_[i]->gpu2ps_data();
 
@@ -98,9 +105,9 @@ void Solver<Dtype>::Init(const SolverParameter& param) {
         //   ));
       }else{
         worker_.push_back(std::shared_ptr<ps::WorkerGroup<Dtype> >
-          (new ps::WorkerGroup<Dtype>(i, ps_buffer_[i]->count()*sizeof(Dtype),
-                                 ps_buffer_[i]->mutable_cpu_data(),
-                                 ps_buffer_[i]->mutable_cpu_diff(),
+          (new ps::WorkerGroup<Dtype>(i, learnable_params[i]->count()*sizeof(Dtype),
+	                         (Dtype*)ps_data_[i].get(),
+				 (Dtype*)ps_diff_[i].get(),
                                  Caffe::master_addr())
            ));
       }
@@ -290,6 +297,7 @@ void Solver<Dtype>::Step(int iters) {
       Timer tim = Timer();
       tim.Start();
       loss += ForwardBackwardWithDWBP();
+      //loss += net_->ForwardBackward();
       tim.Stop();
       eps += tim.Seconds();
     }
@@ -450,6 +458,7 @@ void Solver<Dtype>::AsyncGradGPUsThread(int device) {
   }
 }
 
+/*
 // DWBP: collect gradients for the finished layer, and sync new paramters for all GPUs
 template <typename Dtype>
 void Solver<Dtype>::AsyncGradGPUs(int id) {
@@ -484,6 +493,7 @@ void Solver<Dtype>::AsyncGradGPUs(int id) {
   tim.Stop();
   //LOG(INFO) << "AsyncGradGPUs " << id << " takes " << tim.Seconds();
 }
+*/
 
 template <typename Dtype>
 void Solver<Dtype>::Solve(const char* resume_file) {
@@ -617,7 +627,7 @@ void Solver<Dtype>::Test(const int test_net_id) {
     LOG(INFO) << "    Test net output #" << i << ": " << output_name << " = "
               << mean_score << loss_msg_stream.str();
 
-    AverageLossOverWorkers(&mean_score);
+    //AverageLossOverWorkers(&mean_score);
 
     LOG(INFO) << "    Test net output #" << i << ": " << output_name << " = "
               << mean_score << loss_msg_stream.str();
