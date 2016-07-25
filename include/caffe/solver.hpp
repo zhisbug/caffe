@@ -37,10 +37,21 @@ typedef boost::function<SolverAction::Enum()> ActionCallback;
 template <typename Dtype>
 class MySyncer {
 public:
-    MySyncer(void* cpu_data, void* cpu_diff,
-             void* gpu_data, void* gpu_diff, size_t bytes) :
-      cpu_data_(cpu_data), cpu_diff_(cpu_diff),
-      gpu_data_(gpu_data), gpu_diff_(gpu_diff), size_(bytes) {}
+    //MySyncer(void* cpu_data, void* cpu_diff,
+    //         void* gpu_data, void* gpu_diff, size_t bytes) :
+    //  cpu_data_(cpu_data), cpu_diff_(cpu_diff),
+    //  gpu_data_(gpu_data), gpu_diff_(gpu_diff), size_(bytes) {}
+    MySyncer(Blob<Dtype>* lp) {
+      size_ = sizeof(Dtype) * lp->count();
+      gpu_data_ = lp->mutable_gpu_data();
+      gpu_diff_ = lp->mutable_gpu_diff();
+      CUDA_CHECK(cudaMallocHost(&cpu_data_, size_));
+      CUDA_CHECK(cudaMallocHost(&cpu_diff_, size_));
+    }
+    ~MySyncer() {
+      cudaFreeHost(cpu_data_);
+      cudaFreeHost(cpu_diff_);
+    }
     void gpu2ps_data(){
         cudaMemcpy(cpu_data_, gpu_data_,
                    size_, cudaMemcpyDeviceToHost);
